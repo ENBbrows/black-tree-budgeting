@@ -1,0 +1,15 @@
+{
+  "name": "Black Tree — Financial Dashboard",
+  "short_name": "BT Dashboard",
+  "description": "Budgeting, cash flow, savings and goal-tracking dashboard for Black Tree Investments.",
+  "start_url": "dashboard.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#FAF7F2",
+  "theme_color": "#FAF7F2",
+  "orientation": "any",
+  "icons": [
+    { "src": "assets/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "assets/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>My Clients — Black Tree</title>
+<link rel="apple-touch-icon" href="assets/icon-180.png">
+<link rel="icon" href="assets/icon-32.png">
+<meta name="theme-color" content="#FAF7F2">
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="theme.css" />
+<style>
+  .bt-client-row { display:flex; align-items:center; justify-content:space-between; padding:14px 0; border-bottom:1px solid var(--bt-border); gap:10px; flex-wrap:wrap; }
+  .bt-client-row:last-child { border-bottom:none; }
+  .bt-client-row .meta { font-size:0.78rem; color:var(--bt-muted); }
+</style>
+</head>
+<body>
+<div class="bt-header bt-header--row" style="max-width:720px;margin:0 auto">
+  <img src="assets/wordmark-gold.png" alt="Black Tree Investments" style="height:26px">
+  <button class="bt-btn bt-btn--ghost bt-btn--sm" id="bt-logout">Log out</button>
+</div>
+
+<div class="bt-container" style="max-width:720px">
+  <h1>My Clients</h1>
+  <p class="bt-sub">Read-only access to the numbers of clients assigned to you — for consultation prep, not editing.</p>
+
+  <div class="bt-card">
+    <h2>Add a client</h2>
+    <p class="bt-sub" style="margin-bottom:10px">The client must have already signed in at least once with their email.</p>
+    <div class="bt-field-row">
+      <div><input id="claim-email" type="email" placeholder="client@email.com" /></div>
+    </div>
+    <button class="bt-btn bt-btn--gold" id="claim-submit" style="margin-top:12px">Add client</button>
+    <div id="claim-status" style="font-size:0.85rem;margin-top:8px"></div>
+  </div>
+
+  <div class="bt-card">
+    <h2>Assigned clients</h2>
+    <div id="client-list"><div class="bt-empty">No clients assigned yet.</div></div>
+  </div>
+
+  <p class="bt-sub" style="text-align:center"><a href="dashboard.html">Track my own budget →</a></p>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="config.js"></script>
+<script src="auth.js"></script>
+<script src="store.js"></script>
+<script>
+  async function loadClients() {
+    const wrap = document.getElementById("client-list");
+    if (!navigator.onLine) {
+      wrap.innerHTML = '<div class="bt-empty">Connect once to load your client list — the list itself isn\'t cached offline.</div>';
+      return;
+    }
+    const { data, error } = await btSupabase.from("bt_profiles").select("*").order("full_name");
+    if (error) { wrap.innerHTML = '<div class="bt-empty">Couldn\'t load clients.</div>'; return; }
+    const clients = data.filter((p) => p.role === "client");
+    if (!clients.length) { wrap.innerHTML = '<div class="bt-empty">No clients assigned yet.</div>'; return; }
+    wrap.innerHTML = clients.map((c) => `
+      <div class="bt-client-row">
+        <div>
+          <div>${c.full_name || c.email}</div>
+          <div class="meta">${c.email}</div>
+        </div>
+        <a class="bt-btn bt-btn--ghost bt-btn--sm" style="text-decoration:none" href="dashboard.html?client=${c.id}">View dashboard →</a>
+      </div>
+    `).join("");
+  }
+
+  async function init() {
+    const user = await btRequireAuth();
+    if (!user) return;
+    window.btCurrentUserId = user.id;
+
+    const profile = await btGetOrLoadProfile(user.id);
+    if (profile && profile.role !== "agent") {
+      window.location.replace("dashboard.html");
+      return;
+    }
+
+    loadClients();
+
+    document.getElementById("bt-logout").addEventListener("click", async () => { await btSignOut(); window.location.replace("login.html"); });
+
+    document.getElementById("claim-submit").addEventListener("click", async () => {
+      const email = document.getElementById("claim-email").value.trim();
+      const statusEl = document.getElementById("claim-status");
+      if (!email) { statusEl.textContent = "Enter a client email."; statusEl.style.color = "var(--bt-red)"; return; }
+      if (!navigator.onLine) { statusEl.textContent = "You need a connection to add a client."; statusEl.style.color = "var(--bt-red)"; return; }
+      statusEl.textContent = "Adding…"; statusEl.style.color = "var(--bt-muted)";
+      const { data, error } = await btSupabase.rpc("bt_claim_client", { client_email: email });
+      if (error || !data?.ok) {
+        const reason = data?.error === "no_account" ? "No account found for that email — ask the client to sign in once first."
+          : data?.error === "not_a_client" ? "That email belongs to an agent, not a client."
+          : "Couldn't add that client.";
+        statusEl.textContent = reason; statusEl.style.color = "var(--bt-red)";
+        return;
+      }
+      statusEl.textContent = "Client added."; statusEl.style.color = "var(--bt-green)";
+      document.getElementById("claim-email").value = "";
+      loadClients();
+    });
+
+    if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
+  }
+  init();
+</script>
+</body>
+</html>

@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Expense Tracker — Black Tree</title>
+<link rel="manifest" href="manifest-expense.webmanifest">
+<link rel="apple-touch-icon" href="assets/icon-180.png">
+<link rel="icon" href="assets/icon-32.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="BT Expense">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#FAF7F2">
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="theme.css" />
+</head>
+<body>
+<div class="bt-header">
+  <img src="assets/wordmark-gold.png" alt="Black Tree Investments" style="height:28px">
+</div>
+
+<div class="bt-container">
+  <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px">
+    <h1>Expense Tracker</h1>
+    <span id="bt-net-badge" class="bt-badge bt-badge--online">Online</span>
+  </div>
+  <p class="bt-sub">Log spending as it happens. Saves instantly, even with no signal.</p>
+
+  <div class="bt-card">
+    <label for="f-category">Category</label>
+    <select id="f-category"></select>
+
+    <div id="link-wrap" style="display:none">
+      <label for="f-link">Apply toward <span style="font-weight:400;color:var(--bt-muted)">(optional)</span></label>
+      <select id="f-link"><option value="">— none —</option></select>
+    </div>
+
+    <div class="bt-field-row">
+      <div>
+        <label for="f-amount">Amount</label>
+        <input id="f-amount" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0.00" />
+      </div>
+      <div>
+        <label for="f-date">Date</label>
+        <input id="f-date" type="date" />
+      </div>
+    </div>
+
+    <label for="f-notes">Notes <span style="font-weight:400;color:var(--bt-muted)">(optional)</span></label>
+    <input id="f-notes" type="text" placeholder="" />
+
+    <button class="bt-btn bt-btn--gold" id="f-submit" style="margin-top:18px">Save expense</button>
+  </div>
+
+  <h2>Recent entries</h2>
+  <div class="bt-card" id="bt-recent"><div class="bt-empty">Nothing logged yet.</div></div>
+</div>
+
+<div class="bt-toast" id="bt-toast"></div>
+
+<nav class="bt-bottom-nav">
+  <a href="income.html">Income</a>
+  <a href="expense.html" class="active">Expense</a>
+  <a href="dashboard.html">Dashboard</a>
+</nav>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="config.js"></script>
+<script src="auth.js"></script>
+<script src="store.js"></script>
+<script>
+  let btUid = null;
+
+  function toast(msg) {
+    const el = document.getElementById("bt-toast");
+    el.textContent = msg;
+    el.classList.add("show");
+    clearTimeout(toast._t);
+    toast._t = setTimeout(() => el.classList.remove("show"), 2600);
+  }
+
+  function updateNetBadge() {
+    const el = document.getElementById("bt-net-badge");
+    if (navigator.onLine) { el.textContent = "Online"; el.className = "bt-badge bt-badge--online"; }
+    else { el.textContent = "Offline — saving locally"; el.className = "bt-badge bt-badge--offline"; }
+  }
+  window.addEventListener("online", updateNetBadge);
+  window.addEventListener("offline", updateNetBadge);
+
+  function fmtMoney(n) {
+    const store = btLoadStore(btUid);
+    const currency = store.profile?.currency || "TTD";
+    return currency + " " + Number(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  function renderRecent() {
+    const store = btLoadStore(btUid);
+    const wrap = document.getElementById("bt-recent");
+    const rows = [...store.expenses].sort((a, b) => (b.expense_date + b.created_at).localeCompare(a.expense_date + a.created_at)).slice(0, 8);
+    if (!rows.length) { wrap.innerHTML = '<div class="bt-empty">Nothing logged yet.</div>'; return; }
+    wrap.innerHTML = rows.map((r) => `
+      <div class="bt-list-row">
+        <div>
+          <div>${r.category}${r._pending ? '<span class="bt-pending-dot" title="Syncing"></span>' : ""}</div>
+          <div class="meta">${r.expense_date}${r.notes ? " · " + r.notes : ""}</div>
+        </div>
+        <div class="amt">${fmtMoney(r.amount)}</div>
+      </div>
+    `).join("");
+  }
+
+  function updateLinkOptions() {
+    const category = document.getElementById("f-category").value;
+    const linkWrap = document.getElementById("link-wrap");
+    const linkSel = document.getElementById("f-link");
+    const store = btLoadStore(btUid);
+
+    if (category === BT_CONFIG.GOAL_LINK_CATEGORY && store.goals.length) {
+      linkWrap.style.display = "";
+      linkSel.innerHTML = '<option value="">— none —</option>' + store.goals.map((g) => `<option value="${g.id}">${g.description}</option>`).join("");
+      linkSel.dataset.kind = "goal";
+    } else if (category === BT_CONFIG.DEBT_LINK_CATEGORY && store.liabilities.length) {
+      linkWrap.style.display = "";
+      linkSel.innerHTML = '<option value="">— none —</option>' + store.liabilities.map((l) => `<option value="${l.id}">${l.debt_name}</option>`).join("");
+      linkSel.dataset.kind = "liability";
+    } else {
+      linkWrap.style.display = "none";
+      linkSel.value = "";
+    }
+  }
+
+  async function init() {
+    const user = await btRequireAuth();
+    if (!user) return;
+    btUid = window.btCurrentUserId = user.id;
+
+    document.getElementById("f-date").value = new Date().toISOString().slice(0, 10);
+    const catSel = document.getElementById("f-category");
+    catSel.innerHTML = BT_CONFIG.EXPENSE_CATEGORIES.map((c) => `<option value="${c}">${c}</option>`).join("");
+    catSel.addEventListener("change", updateLinkOptions);
+
+    updateNetBadge();
+    renderRecent();
+    updateLinkOptions();
+    btSync(btUid).then(() => { renderRecent(); updateLinkOptions(); });
+
+    document.getElementById("f-submit").addEventListener("click", () => {
+      const category = catSel.value;
+      const amount = parseFloat(document.getElementById("f-amount").value);
+      const expense_date = document.getElementById("f-date").value;
+      const notes = document.getElementById("f-notes").value.trim() || null;
+      const linkSel = document.getElementById("f-link");
+      const linkId = linkSel.value || null;
+
+      if (!amount || amount <= 0) return toast("Enter a valid amount.");
+      if (!expense_date) return toast("Pick a date.");
+
+      const payload = { category, amount, expense_date, notes, goal_id: null, liability_id: null };
+      if (linkId && linkSel.dataset.kind === "goal") payload.goal_id = linkId;
+      if (linkId && linkSel.dataset.kind === "liability") payload.liability_id = linkId;
+
+      btAddExpense(btUid, payload);
+      renderRecent();
+      toast(navigator.onLine ? "Expense saved" : "Saved offline — will sync automatically");
+
+      document.getElementById("f-amount").value = "";
+      document.getElementById("f-notes").value = "";
+    });
+
+    if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
+  }
+  init();
+</script>
+</body>
+</html>

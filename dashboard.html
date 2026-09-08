@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Dashboard — Black Tree</title>
+<link rel="manifest" href="manifest-dashboard.webmanifest">
+<link rel="apple-touch-icon" href="assets/icon-180.png">
+<link rel="icon" href="assets/icon-32.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="BT Dashboard">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#FAF7F2">
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="theme.css" />
+<style>
+  .bt-header--row { max-width: 1080px; margin: 0 auto; }
+  .bt-topbar { display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; }
+  .bt-topbar-right { display:flex; align-items:center; gap:10px; }
+  .bt-agent-banner { background: var(--bt-ink); color: var(--bt-white); text-align:center; padding: 10px; font-size: 0.85rem; }
+  .bt-agent-banner a { color: var(--bt-gold-light); }
+  canvas { width: 100%; display:block; }
+  .bt-section-head { display:flex; align-items:center; justify-content:space-between; margin: 26px 0 10px; }
+  .bt-mini-form { display:none; margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--bt-border); }
+  .bt-mini-form.show { display:block; }
+  .bt-goal-item, .bt-debt-item { padding: 14px 0; border-bottom: 1px solid var(--bt-border); }
+  .bt-goal-item:last-child, .bt-debt-item:last-child { border-bottom:none; }
+  .bt-goal-item .row1, .bt-debt-item .row1 { display:flex; justify-content:space-between; font-size:0.92rem; margin-bottom:6px; }
+  .bt-goal-item .meta, .bt-debt-item .meta { font-size:0.78rem; color:var(--bt-muted); margin-top:6px; }
+  select[readonly], input[readonly] { background: var(--bt-cream); }
+</style>
+</head>
+<body>
+<div id="bt-agent-banner" class="bt-agent-banner" style="display:none"></div>
+<div class="bt-header bt-header--row">
+  <img src="assets/wordmark-gold.png" alt="Black Tree Investments" style="height:26px">
+  <div class="bt-topbar-right">
+    <a id="bt-agent-link" href="agent.html" class="bt-btn bt-btn--ghost bt-btn--sm" style="display:none;text-decoration:none">My Clients</a>
+    <span id="bt-net-badge" class="bt-badge bt-badge--online">Online</span>
+    <button class="bt-btn bt-btn--ghost bt-btn--sm" id="bt-logout">Log out</button>
+  </div>
+</div>
+
+<div class="bt-container bt-container--wide">
+  <h1 id="bt-greeting">Your Financial Summary</h1>
+  <p class="bt-sub" id="bt-sync-note">—</p>
+
+  <div id="bt-flags"></div>
+
+  <div class="bt-dash-grid">
+    <div>
+      <div class="bt-card">
+        <h2>This Week</h2>
+        <div class="bt-stat-grid" id="stats-week"></div>
+      </div>
+      <div class="bt-card">
+        <h2>This Month</h2>
+        <div class="bt-stat-grid" id="stats-month"></div>
+      </div>
+      <div class="bt-card">
+        <h2>Year to Date</h2>
+        <div class="bt-stat-grid" id="stats-ytd"></div>
+      </div>
+
+      <div class="bt-card">
+        <h2>Cash Flow — Last 6 Months</h2>
+        <canvas id="chart-cashflow" height="220"></canvas>
+      </div>
+
+      <div class="bt-card">
+        <h2>Spending by Category — This Month</h2>
+        <div id="chart-category-wrap"><div class="bt-empty">No expenses logged this month yet.</div></div>
+      </div>
+    </div>
+
+    <div>
+      <div class="bt-card">
+        <h2>Savings Target</h2>
+        <p class="bt-sub" id="savings-sub" style="margin-bottom:10px">—</p>
+        <div class="bt-progress"><div id="savings-bar" style="width:0%"></div></div>
+        <div style="display:flex;justify-content:space-between;font-size:0.8rem;color:var(--bt-muted);margin-top:6px">
+          <span id="savings-actual"></span><span id="savings-target"></span>
+        </div>
+      </div>
+
+      <div class="bt-card" id="goals-card">
+        <div class="bt-section-head" style="margin:0 0 6px">
+          <h2>Goals</h2>
+          <button class="bt-btn bt-btn--ghost bt-btn--sm" id="toggle-goal-form">+ Add goal</button>
+        </div>
+        <div id="goals-list"><div class="bt-empty">No goals yet.</div></div>
+        <div class="bt-mini-form" id="goal-form">
+          <label>Description</label>
+          <input id="g-desc" type="text" placeholder="e.g. Vacation Fund" />
+          <label>Category</label>
+          <select id="g-category"></select>
+          <div class="bt-field-row">
+            <div><label>Target amount</label><input id="g-target" type="number" min="0" step="0.01" /></div>
+            <div><label>Already saved</label><input id="g-opening" type="number" min="0" step="0.01" value="0" /></div>
+          </div>
+          <label>Target date <span style="font-weight:400;color:var(--bt-muted)">(optional)</span></label>
+          <input id="g-date" type="date" />
+          <button class="bt-btn bt-btn--gold" id="g-submit" style="margin-top:14px">Save goal</button>
+        </div>
+      </div>
+
+      <div class="bt-card" id="debts-card">
+        <div class="bt-section-head" style="margin:0 0 6px">
+          <h2>Debt Tracker</h2>
+          <button class="bt-btn bt-btn--ghost bt-btn--sm" id="toggle-debt-form">+ Add debt</button>
+        </div>
+        <div id="debts-list"><div class="bt-empty">No debts tracked.</div></div>
+        <div class="bt-mini-form" id="debt-form">
+          <label>Debt name</label>
+          <input id="d-name" type="text" placeholder="e.g. Car Loan" />
+          <label>Lender <span style="font-weight:400;color:var(--bt-muted)">(optional)</span></label>
+          <input id="d-lender" type="text" />
+          <div class="bt-field-row">
+            <div><label>Current balance owed</label><input id="d-balance" type="number" min="0" step="0.01" /></div>
+            <div><label>Interest rate % <span style="font-weight:400">(optional)</span></label><input id="d-rate" type="number" min="0" step="0.01" /></div>
+          </div>
+          <label>Minimum payment <span style="font-weight:400;color:var(--bt-muted)">(optional)</span></label>
+          <input id="d-min" type="number" min="0" step="0.01" />
+          <button class="bt-btn bt-btn--gold" id="d-submit" style="margin-top:14px">Save debt</button>
+        </div>
+      </div>
+
+      <div class="bt-card" id="settings-card">
+        <h2>Settings</h2>
+        <label>Full name</label>
+        <input id="s-name" type="text" />
+        <div class="bt-field-row">
+          <div><label>Currency</label><input id="s-currency" type="text" maxlength="6" /></div>
+          <div><label>Annual savings target</label><input id="s-target" type="number" min="0" max="100" step="1" /></div>
+        </div>
+        <button class="bt-btn bt-btn--ghost" id="s-save" style="margin-top:14px">Save settings</button>
+      </div>
+
+      <p class="bt-sub" style="text-align:center"><a href="setup-guide.html">Add these to your home screen →</a></p>
+    </div>
+  </div>
+</div>
+
+<div class="bt-toast" id="bt-toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="config.js"></script>
+<script src="auth.js"></script>
+<script src="store.js"></script>
+<script>
+  let btUid = null;      // whose data we're viewing
+  let btViewerId = null; // who is actually logged in
+  let readOnly = false;
+
+  function toast(msg) {
+    const el = document.getElementById("bt-toast");
+    el.textContent = msg; el.classList.add("show");
+    clearTimeout(toast._t); toast._t = setTimeout(() => el.classList.remove("show"), 2600);
+  }
+
+  function updateNetBadge() {
+    const el = document.getElementById("bt-net-badge");
+    if (navigator.onLine) { el.textContent = "Online"; el.className = "bt-badge bt-badge--online"; }
+    else { el.textContent = "Offline"; el.className = "bt-badge bt-badge--offline"; }
+  }
+  window.addEventListener("online", updateNetBadge);
+  window.addEventListener("offline", updateNetBadge);
+
+  function currency() { return btLoadStore(btUid).profile?.currency || "TTD"; }
+  function fmtMoney(n) { return currency() + " " + Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 }); }
+  function fmtPct(n) { return Math.round(n * 100) + "%"; }
+
+  function renderFlags(flags) {
+    const wrap = document.getElementById("bt-flags");
+    if (!flags.length) { wrap.innerHTML = ""; return; }
+    wrap.innerHTML = flags.map((f) => `<div class="bt-flag bt-flag--${f.level}"><span class="dot"></span><span>${f.text}</span></div>`).join("");
+  }
+
+  function renderStats(elId, period) {
+    const el = document.getElementById(elId);
+    const netClass = period.net > 0 ? "pos" : period.net < 0 ? "neg" : "";
+    el.innerHTML = `
+      <div class="bt-stat"><div class="bt-stat-label">Income</div><div class="bt-stat-value">${fmtMoney(period.income)}</div></div>
+      <div class="bt-stat"><div class="bt-stat-label">Expenses</div><div class="bt-stat-value">${fmtMoney(period.expenses)}</div></div>
+      <div class="bt-stat"><div class="bt-stat-label">Net</div><div class="bt-stat-value ${netClass}">${fmtMoney(period.net)}</div></div>
+    `;
+  }
+
+  function renderSavings(summary) {
+    document.getElementById("savings-sub").textContent = `Target ${fmtPct(summary.targetPct)} of an estimated ${fmtMoney(summary.annualIncomeEstimate)} annual income.`;
+    const pct = summary.annualSavingsTarget > 0 ? Math.min(1, summary.ytdSavingsActual / summary.annualSavingsTarget) : 0;
+    document.getElementById("savings-bar").style.width = (pct * 100) + "%";
+    document.getElementById("savings-actual").textContent = fmtMoney(summary.ytdSavingsActual) + " saved YTD";
+    document.getElementById("savings-target").textContent = "Target " + fmtMoney(summary.annualSavingsTarget) + "/yr";
+  }
+
+  function renderGoals(store) {
+    const list = btGoalProgress(store);
+    const wrap = document.getElementById("goals-list");
+    if (!list.length) { wrap.innerHTML = '<div class="bt-empty">No goals yet.</div>'; return; }
+    wrap.innerHTML = list.map((g) => `
+      <div class="bt-goal-item">
+        <div class="row1"><strong>${g.description}</strong><span>${fmtMoney(g.saved_amount)} / ${fmtMoney(g.target_amount)}</span></div>
+        <div class="bt-progress"><div style="width:${g.progress_pct * 100}%"></div></div>
+        <div class="meta">${g.category}${g.target_date ? " · by " + g.target_date : ""} · ${fmtPct(g.progress_pct)} complete</div>
+      </div>
+    `).join("");
+  }
+
+  function renderDebts(store) {
+    const list = btLiabilityProgress(store);
+    const wrap = document.getElementById("debts-list");
+    if (!list.length) { wrap.innerHTML = '<div class="bt-empty">No debts tracked.</div>'; return; }
+    wrap.innerHTML = list.map((l) => {
+      const pctPaid = l.current_balance > 0 ? Math.min(1, l.paid_via_tracker / l.current_balance) : 0;
+      return `
+      <div class="bt-debt-item">
+        <div class="row1"><strong>${l.debt_name}</strong><span>${fmtMoney(l.estimated_remaining)} left</span></div>
+        <div class="bt-progress"><div style="width:${pctPaid * 100}%"></div></div>
+        <div class="meta">${l.lender || "—"}${l.interest_rate ? " · " + l.interest_rate + "%" : ""} · ${fmtMoney(l.paid_via_tracker)} paid via tracker</div>
+      </div>`;
+    }).join("");
+  }
+
+  function drawBarChart(canvas, labels, seriesA, seriesB, colorA, colorB) {
+    const ctx = canvas.getContext("2d");
+    const dpr = window.devicePixelRatio || 1;
+    const w = canvas.clientWidth || 600, h = 220;
+    canvas.width = w * dpr; canvas.height = h * dpr;
+    ctx.scale(dpr, dpr);
+    ctx.clearRect(0, 0, w, h);
+    const max = Math.max(1, ...seriesA, ...seriesB);
+    const n = labels.length;
+    const groupW = w / n;
+    const barW = groupW * 0.3;
+    const baseY = h - 26;
+    ctx.font = "11px Manrope, sans-serif";
+    ctx.fillStyle = "#8A8078";
+    ctx.textAlign = "center";
+    for (let i = 0; i < n; i++) {
+      const cx = groupW * i + groupW / 2;
+      const ah = (seriesA[i] / max) * (baseY - 10);
+      const bh = (seriesB[i] / max) * (baseY - 10);
+      ctx.fillStyle = colorA;
+      ctx.fillRect(cx - barW - 3, baseY - ah, barW, ah);
+      ctx.fillStyle = colorB;
+      ctx.fillRect(cx + 3, baseY - bh, barW, bh);
+      ctx.fillStyle = "#8A8078";
+      ctx.fillText(labels[i], cx, h - 8);
+    }
+  }
+
+  function renderCashflowChart(store) {
+    const today = new Date();
+    const labels = [], income = [], expenses = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
+      const start = d.toISOString().slice(0, 10);
+      const endD = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+      const end = endD.toISOString().slice(0, 10);
+      labels.push(d.toLocaleString(undefined, { month: "short" }));
+      income.push(btSumInRange(store.income, "entry_date", start, end));
+      expenses.push(btSumInRange(store.expenses, "expense_date", start, end));
+    }
+    drawBarChart(document.getElementById("chart-cashflow"), labels, income, expenses, "#C29133", "#221E1F");
+  }
+
+  function renderCategoryBreakdown(store) {
+    const { month } = btPeriodBounds();
+    const inMonth = store.expenses.filter((e) => btDateInRange(e.expense_date, month.start, month.end));
+    const wrap = document.getElementById("chart-category-wrap");
+    if (!inMonth.length) { wrap.innerHTML = '<div class="bt-empty">No expenses logged this month yet.</div>'; return; }
+    const totals = {};
+    inMonth.forEach((e) => { totals[e.category] = (totals[e.category] || 0) + Number(e.amount); });
+    const total = Object.values(totals).reduce((a, b) => a + b, 0);
+    const rows = Object.entries(totals).sort((a, b) => b[1] - a[1]);
+    wrap.innerHTML = rows.map(([cat, amt]) => `
+      <div style="margin-bottom:10px">
+        <div style="display:flex;justify-content:space-between;font-size:0.85rem;margin-bottom:4px"><span>${cat}</span><span>${fmtMoney(amt)} · ${Math.round(amt / total * 100)}%</span></div>
+        <div class="bt-progress"><div style="width:${(amt / total) * 100}%"></div></div>
+      </div>
+    `).join("");
+  }
+
+  function renderAll() {
+    const store = btLoadStore(btUid);
+    document.getElementById("bt-greeting").textContent = store.profile?.full_name ? `Welcome back, ${store.profile.full_name}` : "Your Financial Summary";
+    document.getElementById("bt-sync-note").textContent = store.syncedAt ? "Last synced " + new Date(store.syncedAt).toLocaleString() : "Not yet synced — connect once to load your data.";
+
+    const summary = btDashboardSummary(store);
+    renderFlags(btHealthFlags(store, summary));
+    renderStats("stats-week", summary.periods.week);
+    renderStats("stats-month", summary.periods.month);
+    renderStats("stats-ytd", summary.periods.ytd);
+    renderSavings(summary);
+    renderGoals(store);
+    renderDebts(store);
+    renderCashflowChart(store);
+    renderCategoryBreakdown(store);
+
+    if (!readOnly) {
+      document.getElementById("s-name").value = store.profile?.full_name || "";
+      document.getElementById("s-currency").value = store.profile?.currency || "TTD";
+      document.getElementById("s-target").value = Math.round((store.profile?.annual_savings_target_pct ?? 0.2) * 100);
+    }
+  }
+
+  function setReadOnly() {
+    document.getElementById("settings-card").style.display = "none";
+    document.getElementById("toggle-goal-form").style.display = "none";
+    document.getElementById("toggle-debt-form").style.display = "none";
+  }
+
+  async function init() {
+    const user = await btRequireAuth();
+    if (!user) return;
+    btViewerId = user.id;
+    window.btCurrentUserId = btViewerId;
+
+    const params = new URLSearchParams(window.location.search);
+    const clientId = params.get("client");
+
+    if (clientId && clientId !== btViewerId) {
+      btUid = clientId;
+      readOnly = true;
+      const banner = document.getElementById("bt-agent-banner");
+      banner.style.display = "block";
+      banner.innerHTML = `Viewing a client's dashboard (read-only). <a href="agent.html">← Back to your client list</a>`;
+      setReadOnly();
+      if (navigator.onLine) await btPullSnapshot(btUid).catch(() => {});
+      renderAll();
+    } else {
+      btUid = btViewerId;
+      const profile = await btGetOrLoadProfile(btUid);
+      if (profile?.role === "agent") document.getElementById("bt-agent-link").style.display = "";
+      renderAll();
+      btSync(btUid).then(renderAll);
+    }
+
+    updateNetBadge();
+
+    document.getElementById("bt-logout").addEventListener("click", async () => { await btSignOut(); window.location.replace("login.html"); });
+
+    if (!readOnly) {
+      document.getElementById("g-category").innerHTML = BT_CONFIG.GOAL_CATEGORIES.map((c) => `<option value="${c}">${c}</option>`).join("");
+
+      document.getElementById("toggle-goal-form").addEventListener("click", () => document.getElementById("goal-form").classList.toggle("show"));
+      document.getElementById("toggle-debt-form").addEventListener("click", () => document.getElementById("debt-form").classList.toggle("show"));
+
+      document.getElementById("g-submit").addEventListener("click", () => {
+        const description = document.getElementById("g-desc").value.trim();
+        const target_amount = parseFloat(document.getElementById("g-target").value);
+        const opening_amount = parseFloat(document.getElementById("g-opening").value) || 0;
+        const category = document.getElementById("g-category").value;
+        const target_date = document.getElementById("g-date").value || null;
+        if (!description) return toast("Enter a goal description.");
+        if (!target_amount || target_amount <= 0) return toast("Enter a target amount.");
+        btAddGoal(btUid, { description, category, target_amount, opening_amount, target_date });
+        document.getElementById("g-desc").value = ""; document.getElementById("g-target").value = ""; document.getElementById("g-opening").value = "0"; document.getElementById("g-date").value = "";
+        document.getElementById("goal-form").classList.remove("show");
+        renderAll();
+        toast("Goal saved");
+      });
+
+      document.getElementById("d-submit").addEventListener("click", () => {
+        const debt_name = document.getElementById("d-name").value.trim();
+        const lender = document.getElementById("d-lender").value.trim() || null;
+        const current_balance = parseFloat(document.getElementById("d-balance").value);
+        const interest_rate = parseFloat(document.getElementById("d-rate").value) || null;
+        const min_payment = parseFloat(document.getElementById("d-min").value) || null;
+        if (!debt_name) return toast("Enter a debt name.");
+        if (current_balance === undefined || isNaN(current_balance) || current_balance < 0) return toast("Enter the current balance owed.");
+        btAddLiability(btUid, { debt_name, lender, current_balance, interest_rate, min_payment });
+        document.getElementById("d-name").value = ""; document.getElementById("d-lender").value = ""; document.getElementById("d-balance").value = ""; document.getElementById("d-rate").value = ""; document.getElementById("d-min").value = "";
+        document.getElementById("debt-form").classList.remove("show");
+        renderAll();
+        toast("Debt saved");
+      });
+
+      document.getElementById("s-save").addEventListener("click", () => {
+        const full_name = document.getElementById("s-name").value.trim() || null;
+        const curr = document.getElementById("s-currency").value.trim() || "TTD";
+        const pct = Math.max(0, Math.min(100, parseFloat(document.getElementById("s-target").value) || 0)) / 100;
+        btUpdateProfile(btUid, { full_name, currency: curr, annual_savings_target_pct: pct });
+        renderAll();
+        toast("Settings saved");
+      });
+    }
+
+    window.addEventListener("resize", () => renderCashflowChart(btLoadStore(btUid)));
+    if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
+  }
+  init();
+</script>
+</body>
+</html>

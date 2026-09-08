@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Income Tracker — Black Tree</title>
+<link rel="manifest" href="manifest-income.webmanifest">
+<link rel="apple-touch-icon" href="assets/icon-180.png">
+<link rel="icon" href="assets/icon-32.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="BT Income">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#FAF7F2">
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="theme.css" />
+</head>
+<body>
+<div class="bt-header">
+  <img src="assets/wordmark-gold.png" alt="Black Tree Investments" style="height:28px">
+</div>
+
+<div class="bt-container">
+  <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px">
+    <h1>Income Tracker</h1>
+    <span id="bt-net-badge" class="bt-badge bt-badge--online">Online</span>
+  </div>
+  <p class="bt-sub">Log income as you receive it. Saves instantly, even with no signal.</p>
+
+  <div class="bt-card">
+    <label for="f-source">Income source</label>
+    <input id="f-source" type="text" list="source-suggestions" placeholder="e.g. Salary / Primary Job" />
+    <datalist id="source-suggestions"></datalist>
+
+    <div class="bt-field-row">
+      <div>
+        <label for="f-amount">Amount</label>
+        <input id="f-amount" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0.00" />
+      </div>
+      <div>
+        <label for="f-frequency">Frequency</label>
+        <select id="f-frequency"></select>
+      </div>
+    </div>
+
+    <label for="f-date">Date received</label>
+    <input id="f-date" type="date" />
+
+    <label for="f-notes">Notes <span style="font-weight:400;color:var(--bt-muted)">(optional)</span></label>
+    <input id="f-notes" type="text" placeholder="" />
+
+    <button class="bt-btn bt-btn--gold" id="f-submit" style="margin-top:18px">Save income</button>
+  </div>
+
+  <h2>Recent entries</h2>
+  <div class="bt-card" id="bt-recent"><div class="bt-empty">Nothing logged yet.</div></div>
+</div>
+
+<div class="bt-toast" id="bt-toast"></div>
+
+<nav class="bt-bottom-nav">
+  <a href="income.html" class="active">Income</a>
+  <a href="expense.html">Expense</a>
+  <a href="dashboard.html">Dashboard</a>
+</nav>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="config.js"></script>
+<script src="auth.js"></script>
+<script src="store.js"></script>
+<script>
+  let btUid = null;
+
+  function toast(msg) {
+    const el = document.getElementById("bt-toast");
+    el.textContent = msg;
+    el.classList.add("show");
+    clearTimeout(toast._t);
+    toast._t = setTimeout(() => el.classList.remove("show"), 2600);
+  }
+
+  function updateNetBadge() {
+    const el = document.getElementById("bt-net-badge");
+    if (navigator.onLine) { el.textContent = "Online"; el.className = "bt-badge bt-badge--online"; }
+    else { el.textContent = "Offline — saving locally"; el.className = "bt-badge bt-badge--offline"; }
+  }
+  window.addEventListener("online", updateNetBadge);
+  window.addEventListener("offline", updateNetBadge);
+
+  function fmtMoney(n) {
+    const store = btLoadStore(btUid);
+    const currency = store.profile?.currency || "TTD";
+    return currency + " " + Number(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  function renderRecent() {
+    const store = btLoadStore(btUid);
+    const wrap = document.getElementById("bt-recent");
+    const rows = [...store.income].sort((a, b) => (b.entry_date + b.created_at).localeCompare(a.entry_date + a.created_at)).slice(0, 8);
+    if (!rows.length) { wrap.innerHTML = '<div class="bt-empty">Nothing logged yet.</div>'; return; }
+    wrap.innerHTML = rows.map((r) => `
+      <div class="bt-list-row">
+        <div>
+          <div>${r.source}${r._pending ? '<span class="bt-pending-dot" title="Syncing"></span>' : ""}</div>
+          <div class="meta">${r.frequency} · ${r.entry_date}</div>
+        </div>
+        <div class="amt">${fmtMoney(r.amount)}</div>
+      </div>
+    `).join("");
+  }
+
+  async function init() {
+    const user = await btRequireAuth();
+    if (!user) return;
+    btUid = window.btCurrentUserId = user.id;
+
+    document.getElementById("f-date").value = new Date().toISOString().slice(0, 10);
+    const freqSel = document.getElementById("f-frequency");
+    freqSel.innerHTML = BT_CONFIG.INCOME_FREQUENCIES.map((f) => `<option value="${f}">${f}</option>`).join("");
+    document.getElementById("source-suggestions").innerHTML = BT_CONFIG.INCOME_SOURCE_SUGGESTIONS.map((s) => `<option value="${s}">`).join("");
+
+    updateNetBadge();
+    renderRecent();
+    btSync(btUid).then(renderRecent);
+
+    document.getElementById("f-submit").addEventListener("click", () => {
+      const source = document.getElementById("f-source").value.trim();
+      const amount = parseFloat(document.getElementById("f-amount").value);
+      const frequency = freqSel.value;
+      const entry_date = document.getElementById("f-date").value;
+      const notes = document.getElementById("f-notes").value.trim() || null;
+
+      if (!source) return toast("Enter an income source.");
+      if (!amount || amount <= 0) return toast("Enter a valid amount.");
+      if (!entry_date) return toast("Pick a date.");
+
+      btAddIncome(btUid, { source, amount, frequency, entry_date, notes });
+      renderRecent();
+      toast(navigator.onLine ? "Income saved" : "Saved offline — will sync automatically");
+
+      document.getElementById("f-source").value = "";
+      document.getElementById("f-amount").value = "";
+      document.getElementById("f-notes").value = "";
+    });
+
+    if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
+  }
+  init();
+</script>
+</body>
+</html>

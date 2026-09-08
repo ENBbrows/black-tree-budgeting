@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Black Tree Budgeting — Sign In</title>
+<link rel="apple-touch-icon" href="assets/icon-180.png">
+<link rel="icon" href="assets/icon-32.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#221E1F">
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="theme.css" />
+<style>
+  body { display: flex; align-items: center; min-height: 100vh; }
+  .bt-login-card { text-align: center; }
+  .bt-login-card img.emblem { height: 84px; margin-bottom: 14px; }
+  .bt-login-card img.wordmark { height: 46px; margin-bottom: 26px; }
+  #bt-status { font-size: 0.86rem; margin-top: 14px; min-height: 1.2em; }
+  #bt-status.err { color: var(--bt-red); }
+  #bt-status.ok { color: var(--bt-green); }
+  .bt-note { font-size: 0.78rem; color: var(--bt-muted); margin-top: 22px; line-height: 1.5; }
+</style>
+</head>
+<body>
+<div class="bt-container bt-login-card">
+  <img class="emblem" src="assets/emblem-gold.png" alt="">
+  <img class="wordmark" src="assets/wordmark-gold.png" alt="Black Tree Investments">
+
+  <div class="bt-card" style="text-align:left">
+    <h1 style="text-align:center">Sign in</h1>
+    <p class="bt-sub" style="text-align:center">We'll email you a secure one-time link — no password to remember or share.</p>
+    <label for="bt-email">Email address</label>
+    <input id="bt-email" type="email" inputmode="email" autocomplete="email" placeholder="you@email.com" />
+    <button class="bt-btn bt-btn--gold" id="bt-send" style="margin-top:18px">Send secure link</button>
+    <div id="bt-status"></div>
+  </div>
+
+  <p class="bt-note">
+    Each link is single-use and expires shortly after it's sent, and only works for the email address it was sent to —
+    forwarding it to someone else won't give them access to your data.
+  </p>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="config.js"></script>
+<script src="auth.js"></script>
+<script src="store.js"></script>
+<script>
+  (async function () {
+    // Already have a session on this device? Skip straight through.
+    const session = await btGetSession();
+    if (session) {
+      const params = new URLSearchParams(window.location.search);
+      window.location.replace(params.get("redirect") || "dashboard.html");
+      return;
+    }
+
+    const statusEl = document.getElementById("bt-status");
+    const btn = document.getElementById("bt-send");
+    const emailEl = document.getElementById("bt-email");
+
+    btn.addEventListener("click", async () => {
+      const email = emailEl.value.trim();
+      if (!email || !email.includes("@")) {
+        statusEl.textContent = "Enter a valid email address.";
+        statusEl.className = "err";
+        return;
+      }
+      if (!navigator.onLine) {
+        statusEl.textContent = "You're offline — signing in for the first time needs a connection.";
+        statusEl.className = "err";
+        return;
+      }
+      btn.disabled = true;
+      btn.textContent = "Sending…";
+      statusEl.textContent = "";
+      statusEl.className = "";
+      try {
+        await btSendMagicLink(email);
+        statusEl.textContent = "Check your email for the link — it may take a minute to arrive.";
+        statusEl.className = "ok";
+        btn.textContent = "Link sent";
+      } catch (err) {
+        statusEl.textContent = err.message || "Couldn't send the link. Try again.";
+        statusEl.className = "err";
+        btn.disabled = false;
+        btn.textContent = "Send secure link";
+      }
+    });
+
+    if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
+  })();
+</script>
+</body>
+</html>
