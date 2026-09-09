@@ -45,10 +45,18 @@
 </div>
 
 <div class="bt-container bt-container--wide">
-  <h1 id="bt-greeting">Your Financial Summary</h1>
-  <p class="bt-sub" id="bt-sync-note">—</p>
+  <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap">
+    <div>
+      <h1 id="bt-greeting">Your Financial Summary</h1>
+      <p class="bt-sub" id="bt-sync-note" style="margin-bottom:0">—</p>
+    </div>
+    <div id="currency-view-wrap" style="text-align:right">
+      <label for="view-currency" data-tip="Converts the totals below into this currency using the exchange rates you set in Settings. Doesn't change how anything is stored — just how it's displayed." style="margin:0 0 4px">Viewing totals in</label>
+      <select id="view-currency" style="width:auto"></select>
+    </div>
+  </div>
 
-  <div id="bt-flags"></div>
+  <div id="bt-flags" style="margin-top:16px"></div>
 
   <div class="bt-dash-grid">
     <div>
@@ -63,6 +71,12 @@
       <div class="bt-card">
         <h2>Year to Date</h2>
         <div class="bt-stat-grid" id="stats-ytd"></div>
+      </div>
+
+      <div class="bt-card" id="currency-breakdown-card" style="display:none">
+        <h2>Income by Currency — This Month</h2>
+        <p class="bt-sub" style="margin-bottom:10px">Raw totals in each currency, before conversion — the "Viewing totals in" figures above are these, converted into one currency.</p>
+        <div id="currency-breakdown-list"></div>
       </div>
 
       <div class="bt-card">
@@ -93,15 +107,15 @@
         </div>
         <div id="goals-list"><div class="bt-empty">No goals yet.</div></div>
         <div class="bt-mini-form" id="goal-form">
-          <label>Description</label>
+          <label data-tip="A short name for what you're saving toward, e.g. &quot;Vacation Fund&quot;.">Description</label>
           <input id="g-desc" type="text" placeholder="e.g. Vacation Fund" />
-          <label>Category</label>
+          <label data-tip="Roughly what kind of goal this is.">Category</label>
           <select id="g-category"></select>
           <div class="bt-field-row">
-            <div><label>Target amount</label><input id="g-target" type="number" min="0" step="0.01" /></div>
-            <div><label>Already saved</label><input id="g-opening" type="number" min="0" step="0.01" value="0" /></div>
+            <div><label data-tip="The total you're aiming to save.">Target amount</label><input id="g-target" type="number" min="0" step="0.01" /></div>
+            <div><label data-tip="If you'd already put money aside for this before using the tracker, enter it here as a starting point.">Already saved</label><input id="g-opening" type="number" min="0" step="0.01" value="0" /></div>
           </div>
-          <label>Target date <span style="font-weight:400;color:var(--bt-muted)">(optional)</span></label>
+          <label data-tip="Optional — when you'd like to reach this goal by.">Target date <span style="font-weight:400;color:var(--bt-muted)">(optional)</span></label>
           <input id="g-date" type="date" />
           <button class="bt-btn bt-btn--gold" id="g-submit" style="margin-top:14px">Save goal</button>
         </div>
@@ -114,15 +128,15 @@
         </div>
         <div id="debts-list"><div class="bt-empty">No debts tracked.</div></div>
         <div class="bt-mini-form" id="debt-form">
-          <label>Debt name</label>
+          <label data-tip="e.g. &quot;Car Loan&quot; or &quot;Credit Card&quot;.">Debt name</label>
           <input id="d-name" type="text" placeholder="e.g. Car Loan" />
-          <label>Lender <span style="font-weight:400;color:var(--bt-muted)">(optional)</span></label>
+          <label data-tip="Optional — who you owe.">Lender <span style="font-weight:400;color:var(--bt-muted)">(optional)</span></label>
           <input id="d-lender" type="text" />
           <div class="bt-field-row">
-            <div><label>Current balance owed</label><input id="d-balance" type="number" min="0" step="0.01" /></div>
-            <div><label>Interest rate % <span style="font-weight:400">(optional)</span></label><input id="d-rate" type="number" min="0" step="0.01" /></div>
+            <div><label data-tip="What you currently owe, as of your latest statement.">Current balance owed</label><input id="d-balance" type="number" min="0" step="0.01" /></div>
+            <div><label data-tip="Optional — the annual interest rate, if you know it.">Interest rate % <span style="font-weight:400">(optional)</span></label><input id="d-rate" type="number" min="0" step="0.01" /></div>
           </div>
-          <label>Minimum payment <span style="font-weight:400;color:var(--bt-muted)">(optional)</span></label>
+          <label data-tip="Optional — your minimum required payment.">Minimum payment <span style="font-weight:400;color:var(--bt-muted)">(optional)</span></label>
           <input id="d-min" type="number" min="0" step="0.01" />
           <button class="bt-btn bt-btn--gold" id="d-submit" style="margin-top:14px">Save debt</button>
         </div>
@@ -130,13 +144,22 @@
 
       <div class="bt-card" id="settings-card">
         <h2>Settings</h2>
-        <label>Full name</label>
+        <label data-tip="How you'd like to be greeted on your Dashboard, e.g. &quot;Amii&quot; or &quot;Amii Leroux&quot;.">Full name</label>
         <input id="s-name" type="text" />
         <div class="bt-field-row">
-          <div><label>Currency</label><input id="s-currency" type="text" maxlength="6" /></div>
-          <div><label>Annual savings target</label><input id="s-target" type="number" min="0" max="100" step="1" /></div>
+          <div><label data-tip="The currency label shown next to your numbers, e.g. TTD, USD.">Currency</label><input id="s-currency" type="text" maxlength="6" /></div>
+          <div><label data-tip="What percent of your income you're aiming to save each year. 20% is a good target for long-term financial independence.">Annual savings target</label><input id="s-target" type="number" min="0" max="100" step="1" /></div>
         </div>
+        <div id="fx-rates-wrap" style="margin-top:16px;padding-top:14px;border-top:1px dashed var(--bt-border)">
+          <label style="margin:0 0 8px" data-tip="Manual exchange rates for any foreign currency you log income in — set once, updated whenever you like. Nothing is fetched automatically, so this keeps working offline.">Exchange rates</label>
+          <div id="fx-rates-list"></div>
+        </div>
+
         <button class="bt-btn bt-btn--ghost" id="s-save" style="margin-top:14px">Save settings</button>
+
+        <label style="margin-top:20px;display:flex;align-items:center;gap:8px;font-weight:400;color:var(--bt-muted);cursor:pointer">
+          <input type="checkbox" id="s-show-tips" style="width:auto" /> Show help bubbles on form fields
+        </label>
       </div>
 
       <p class="bt-sub" style="text-align:center"><a href="setup-guide.html">Add these to your home screen →</a></p>
@@ -150,6 +173,7 @@
 <script src="config.js"></script>
 <script src="auth.js"></script>
 <script src="store.js"></script>
+<script src="tips.js"></script>
 <script>
   let btUid = null;      // whose data we're viewing
   let btViewerId = null; // who is actually logged in
@@ -169,8 +193,11 @@
   window.addEventListener("online", updateNetBadge);
   window.addEventListener("offline", updateNetBadge);
 
-  function currency() { return btLoadStore(btUid).profile?.currency || "TTD"; }
-  function fmtMoney(n) { return currency() + " " + Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 }); }
+  let viewCurrency = null; // null until init() resolves it from localStorage / profile
+
+  function homeCurrency() { return btLoadStore(btUid).profile?.currency || "TTD"; }
+  function fmtMoney(n) { return (viewCurrency || homeCurrency()) + " " + Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 }); }
+  function fmtHome(n) { return homeCurrency() + " " + Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 }); }
   function fmtPct(n) { return Math.round(n * 100) + "%"; }
 
   function renderFlags(flags) {
@@ -203,7 +230,7 @@
     if (!list.length) { wrap.innerHTML = '<div class="bt-empty">No goals yet.</div>'; return; }
     wrap.innerHTML = list.map((g) => `
       <div class="bt-goal-item">
-        <div class="row1"><strong>${g.description}</strong><span>${fmtMoney(g.saved_amount)} / ${fmtMoney(g.target_amount)}</span></div>
+        <div class="row1"><strong>${g.description}</strong><span>${fmtHome(g.saved_amount)} / ${fmtHome(g.target_amount)}</span></div>
         <div class="bt-progress"><div style="width:${g.progress_pct * 100}%"></div></div>
         <div class="meta">${g.category}${g.target_date ? " · by " + g.target_date : ""} · ${fmtPct(g.progress_pct)} complete</div>
       </div>
@@ -218,9 +245,9 @@
       const pctPaid = l.current_balance > 0 ? Math.min(1, l.paid_via_tracker / l.current_balance) : 0;
       return `
       <div class="bt-debt-item">
-        <div class="row1"><strong>${l.debt_name}</strong><span>${fmtMoney(l.estimated_remaining)} left</span></div>
+        <div class="row1"><strong>${l.debt_name}</strong><span>${fmtHome(l.estimated_remaining)} left</span></div>
         <div class="bt-progress"><div style="width:${pctPaid * 100}%"></div></div>
-        <div class="meta">${l.lender || "—"}${l.interest_rate ? " · " + l.interest_rate + "%" : ""} · ${fmtMoney(l.paid_via_tracker)} paid via tracker</div>
+        <div class="meta">${l.lender || "—"}${l.interest_rate ? " · " + l.interest_rate + "%" : ""} · ${fmtHome(l.paid_via_tracker)} paid via tracker</div>
       </div>`;
     }).join("");
   }
@@ -262,19 +289,23 @@
       const endD = new Date(d.getFullYear(), d.getMonth() + 1, 0);
       const end = endD.toISOString().slice(0, 10);
       labels.push(d.toLocaleString(undefined, { month: "short" }));
-      income.push(btSumInRange(store.income, "entry_date", start, end));
-      expenses.push(btSumInRange(store.expenses, "expense_date", start, end));
+      income.push(btSumIncomeInRange(store.income, start, end, viewCurrency, store.profile).total);
+      expenses.push(btSumExpensesInRange(store.expenses, start, end, viewCurrency, store.profile).total);
     }
     drawBarChart(document.getElementById("chart-cashflow"), labels, income, expenses, "#C29133", "#221E1F");
   }
 
   function renderCategoryBreakdown(store) {
     const { month } = btPeriodBounds();
+    const home = homeCurrency();
     const inMonth = store.expenses.filter((e) => btDateInRange(e.expense_date, month.start, month.end));
     const wrap = document.getElementById("chart-category-wrap");
     if (!inMonth.length) { wrap.innerHTML = '<div class="bt-empty">No expenses logged this month yet.</div>'; return; }
     const totals = {};
-    inMonth.forEach((e) => { totals[e.category] = (totals[e.category] || 0) + Number(e.amount); });
+    inMonth.forEach((e) => {
+      const { value } = btConvertAmount(Number(e.amount), home, viewCurrency, store.profile);
+      totals[e.category] = (totals[e.category] || 0) + value;
+    });
     const total = Object.values(totals).reduce((a, b) => a + b, 0);
     const rows = Object.entries(totals).sort((a, b) => b[1] - a[1]);
     wrap.innerHTML = rows.map(([cat, amt]) => `
@@ -285,12 +316,52 @@
     `).join("");
   }
 
+  function renderCurrencyBreakdown(store) {
+    const { month } = btPeriodBounds();
+    const totals = btIncomeBreakdownByCurrency(store, month.start, month.end);
+    const currencies = Object.keys(totals);
+    const card = document.getElementById("currency-breakdown-card");
+    if (currencies.length < 2) { card.style.display = "none"; return; }
+    card.style.display = "";
+    document.getElementById("currency-breakdown-list").innerHTML = currencies.sort().map((cur) => `
+      <div class="bt-list-row"><div>${cur}</div><div class="amt">${cur} ${totals[cur].toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</div></div>
+    `).join("");
+  }
+
+  function renderCurrencySelector(store) {
+    const home = store.profile?.currency || "TTD";
+    const options = btCurrencyOptions(store.profile);
+    if (!viewCurrency || !options.includes(viewCurrency)) {
+      const saved = localStorage.getItem("bt_view_currency_" + btUid);
+      viewCurrency = (saved && options.includes(saved)) ? saved : home;
+    }
+    const sel = document.getElementById("view-currency");
+    sel.innerHTML = options.map((c) => `<option value="${c}"${c === viewCurrency ? " selected" : ""}>${c}</option>`).join("");
+  }
+
+  function renderFxRatesInputs(store) {
+    const home = store.profile?.currency || "TTD";
+    const extras = (BT_CONFIG.EXTRA_CURRENCIES || []).filter((c) => c !== home);
+    const rates = store.profile?.fx_rates || {};
+    const wrap = document.getElementById("fx-rates-list");
+    if (!extras.length) { wrap.innerHTML = ""; return; }
+    wrap.innerHTML = extras.map((cur) => `
+      <div class="bt-field-row" style="align-items:center;margin-bottom:8px">
+        <div style="flex:none;font-size:0.88rem;width:110px">1 ${cur} =</div>
+        <div><input type="number" min="0" step="0.0001" class="fx-rate-input" data-currency="${cur}" value="${rates[cur] || ""}" placeholder="not set" /></div>
+        <div style="flex:none;font-size:0.88rem">${home}</div>
+      </div>
+    `).join("");
+  }
+
   function renderAll() {
     const store = btLoadStore(btUid);
     document.getElementById("bt-greeting").textContent = store.profile?.full_name ? `Welcome back, ${store.profile.full_name}` : "Your Financial Summary";
     document.getElementById("bt-sync-note").textContent = store.syncedAt ? "Last synced " + new Date(store.syncedAt).toLocaleString() : "Not yet synced — connect once to load your data.";
 
-    const summary = btDashboardSummary(store);
+    renderCurrencySelector(store);
+
+    const summary = btDashboardSummary(store, viewCurrency);
     renderFlags(btHealthFlags(store, summary));
     renderStats("stats-week", summary.periods.week);
     renderStats("stats-month", summary.periods.month);
@@ -300,11 +371,13 @@
     renderDebts(store);
     renderCashflowChart(store);
     renderCategoryBreakdown(store);
+    renderCurrencyBreakdown(store);
 
     if (!readOnly) {
       document.getElementById("s-name").value = store.profile?.full_name || "";
       document.getElementById("s-currency").value = store.profile?.currency || "TTD";
       document.getElementById("s-target").value = Math.round((store.profile?.annual_savings_target_pct ?? 0.2) * 100);
+      renderFxRatesInputs(store);
     }
   }
 
@@ -347,6 +420,10 @@
     if (!readOnly) {
       document.getElementById("g-category").innerHTML = BT_CONFIG.GOAL_CATEGORIES.map((c) => `<option value="${c}">${c}</option>`).join("");
 
+      const showTipsBox = document.getElementById("s-show-tips");
+      showTipsBox.checked = !btTipsHidden();
+      showTipsBox.addEventListener("change", () => btSetTipsHidden(!showTipsBox.checked));
+
       document.getElementById("toggle-goal-form").addEventListener("click", () => document.getElementById("goal-form").classList.toggle("show"));
       document.getElementById("toggle-debt-form").addEventListener("click", () => document.getElementById("debt-form").classList.toggle("show"));
 
@@ -384,11 +461,22 @@
         const full_name = document.getElementById("s-name").value.trim() || null;
         const curr = document.getElementById("s-currency").value.trim() || "TTD";
         const pct = Math.max(0, Math.min(100, parseFloat(document.getElementById("s-target").value) || 0)) / 100;
-        btUpdateProfile(btUid, { full_name, currency: curr, annual_savings_target_pct: pct });
+        const fx_rates = {};
+        document.querySelectorAll(".fx-rate-input").forEach((el) => {
+          const v = parseFloat(el.value);
+          if (v > 0) fx_rates[el.dataset.currency] = v;
+        });
+        btUpdateProfile(btUid, { full_name, currency: curr, annual_savings_target_pct: pct, fx_rates });
         renderAll();
         toast("Settings saved");
       });
     }
+
+    document.getElementById("view-currency").addEventListener("change", (e) => {
+      viewCurrency = e.target.value;
+      localStorage.setItem("bt_view_currency_" + btUid, viewCurrency);
+      renderAll();
+    });
 
     window.addEventListener("resize", () => renderCashflowChart(btLoadStore(btUid)));
     if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});

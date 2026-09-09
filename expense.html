@@ -30,26 +30,26 @@
   <p class="bt-sub">Log spending as it happens. Saves instantly, even with no signal.</p>
 
   <div class="bt-card">
-    <label for="f-category">Category</label>
+    <label for="f-category" data-tip="What kind of spending this is. Pick Debt Repayment or Savings & Investments if you want it to count toward a goal or debt below.">Category</label>
     <select id="f-category"></select>
 
     <div id="link-wrap" style="display:none">
-      <label for="f-link">Apply toward <span style="font-weight:400;color:var(--bt-muted)">(optional)</span></label>
+      <label for="f-link" data-tip="Optional — pick a goal or debt to automatically add this amount to its progress.">Apply toward <span style="font-weight:400;color:var(--bt-muted)">(optional)</span></label>
       <select id="f-link"><option value="">— none —</option></select>
     </div>
 
     <div class="bt-field-row">
       <div>
-        <label for="f-amount">Amount</label>
+        <label for="f-amount" data-tip="How much you spent, e.g. 250.00.">Amount</label>
         <input id="f-amount" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0.00" />
       </div>
       <div>
-        <label for="f-date">Date</label>
+        <label for="f-date" data-tip="When you spent it. Defaults to today.">Date</label>
         <input id="f-date" type="date" />
       </div>
     </div>
 
-    <label for="f-notes">Notes <span style="font-weight:400;color:var(--bt-muted)">(optional)</span></label>
+    <label for="f-notes" data-tip="Anything extra worth remembering. Examples: &quot;Weekly grocery run&quot;, &quot;Car insurance premium&quot;, &quot;Split with roommate&quot;. Totally optional.">Notes <span style="font-weight:400;color:var(--bt-muted)">(optional)</span></label>
     <input id="f-notes" type="text" placeholder="" />
 
     <button class="bt-btn bt-btn--gold" id="f-submit" style="margin-top:18px">Save expense</button>
@@ -71,6 +71,7 @@
 <script src="config.js"></script>
 <script src="auth.js"></script>
 <script src="store.js"></script>
+<script src="tips.js"></script>
 <script>
   let btUid = null;
 

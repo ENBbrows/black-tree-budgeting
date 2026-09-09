@@ -22,6 +22,13 @@ const BT_CONFIG = {
   ],
   INCOME_FREQUENCIES: ["Weekly", "Bi-Weekly", "Monthly", "Annually", "One-time"],
 
+  /* Foreign currencies a client can log income in, beyond their home
+     currency (set per-profile). Each needs an exchange rate (Settings →
+     Exchange Rates) before it converts into the Dashboard's unified view —
+     rates are set manually, not fetched live, so currency conversion keeps
+     working fully offline like everything else here. */
+  EXTRA_CURRENCIES: ["USD", "GBP", "EUR", "CAD"],
+
   /* Every outflow — including debt payments, savings contributions, and
      insurance — is logged as an "expense" with one of these categories,
      so the single Expense Tracker shortcut can feed the whole dashboard. */

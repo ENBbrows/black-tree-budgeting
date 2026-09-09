@@ -201,6 +201,75 @@ function btSumInRange(entries, dateField, start, end) {
   return entries.filter((e) => btDateInRange(e[dateField], start, end)).reduce((s, e) => s + Number(e.amount), 0);
 }
 
+/* ── Multi-currency: every rate is manual (client-set in Settings), never
+   fetched live, so conversion works fully offline like everything else. ── */
+
+/** Currencies a client can pick from: their home currency first, then the configured extras. */
+function btCurrencyOptions(profile) {
+  const home = profile?.currency || "TTD";
+  const extra = (typeof BT_CONFIG !== "undefined" && BT_CONFIG.EXTRA_CURRENCIES) || [];
+  return [home, ...extra.filter((c) => c !== home)];
+}
+
+/** Converts one amount between currencies via the client's manual fx_rates (foreign -> home). `ok:false` means a needed rate isn't set — value is a best-effort passthrough, not a real conversion. */
+function btConvertAmount(amount, fromCurrency, toCurrency, profile) {
+  const home = profile?.currency || "TTD";
+  if (fromCurrency === toCurrency) return { value: amount, ok: true };
+  const rates = profile?.fx_rates || {};
+  let inHome = amount, ok = true;
+  if (fromCurrency !== home) {
+    const r = rates[fromCurrency];
+    if (r) inHome = amount * r; else ok = false;
+  }
+  if (toCurrency === home) return { value: inHome, ok };
+  const r2 = rates[toCurrency];
+  if (!r2) return { value: inHome, ok: false };
+  return { value: inHome / r2, ok };
+}
+
+function btSumIncomeInRange(entries, start, end, viewCurrency, profile) {
+  const home = profile?.currency || "TTD";
+  let total = 0, unconverted = 0;
+  entries.forEach((e) => {
+    if (!btDateInRange(e.entry_date, start, end)) return;
+    const { value, ok } = btConvertAmount(Number(e.amount), e.currency || home, viewCurrency, profile);
+    total += value;
+    if (!ok) unconverted++;
+  });
+  return { total, unconverted };
+}
+
+function btSumExpensesInRange(entries, start, end, viewCurrency, profile) {
+  const home = profile?.currency || "TTD";
+  let total = 0, unconverted = 0;
+  entries.forEach((e) => {
+    if (!btDateInRange(e.expense_date, start, end)) return;
+    const { value, ok } = btConvertAmount(Number(e.amount), home, viewCurrency, profile);
+    total += value;
+    if (!ok) unconverted++;
+  });
+  return { total, unconverted };
+}
+
+function btSumExpenseCategoryInRange(entries, category, start, end, viewCurrency, profile) {
+  const home = profile?.currency || "TTD";
+  return entries
+    .filter((e) => e.category === category && btDateInRange(e.expense_date, start, end))
+    .reduce((s, e) => s + btConvertAmount(Number(e.amount), home, viewCurrency, profile).value, 0);
+}
+
+/** Raw (unconverted) income totals grouped by their own entry currency — the "per-currency" view alongside the unified one. */
+function btIncomeBreakdownByCurrency(store, start, end) {
+  const home = store.profile?.currency || "TTD";
+  const totals = {};
+  store.income.forEach((e) => {
+    if (!btDateInRange(e.entry_date, start, end)) return;
+    const cur = e.currency || home;
+    totals[cur] = (totals[cur] || 0) + Number(e.amount);
+  });
+  return totals;
+}
+
 function btPeriodBounds(today = new Date()) {
   const d = new Date(today);
   const dow = (d.getDay() + 6) % 7; // Monday = 0
@@ -216,33 +285,40 @@ function btPeriodBounds(today = new Date()) {
   };
 }
 
-/** Estimated annual gross income: simple run-rate off YTD actuals (falls back to 0 with no data yet). */
-function btEstimateAnnualIncome(store, today = new Date()) {
+/** Estimated annual gross income (in viewCurrency): simple run-rate off YTD actuals (falls back to frequency-normalized planned income with no actuals yet). */
+function btEstimateAnnualIncome(store, viewCurrency, today = new Date()) {
+  const profile = store.profile;
+  const vc = viewCurrency || profile?.currency || "TTD";
   const { ytd } = btPeriodBounds(today);
-  const ytdTotal = btSumInRange(store.income, "entry_date", ytd.start, ytd.end);
+  const { total: ytdTotal } = btSumIncomeInRange(store.income, ytd.start, ytd.end, vc, profile);
   const dayOfYear = Math.max(1, Math.ceil((today - new Date(today.getFullYear(), 0, 0)) / 86400000));
   if (ytdTotal > 0) return (ytdTotal / dayOfYear) * 365;
-  // No actuals yet — fall back to frequency-normalized planned income.
-  return store.income.reduce((s, e) => s + Number(e.amount) * (BT_FREQ_TO_MONTHLY[e.frequency] || 0) * 12, 0);
+  return store.income.reduce((s, e) => {
+    const { value } = btConvertAmount(Number(e.amount), e.currency || profile?.currency || "TTD", vc, profile);
+    return s + value * (BT_FREQ_TO_MONTHLY[e.frequency] || 0) * 12;
+  }, 0);
 }
 
-function btDashboardSummary(store, today = new Date()) {
+/** All figures converted into viewCurrency (defaults to the client's home currency) via their manual fx_rates. */
+function btDashboardSummary(store, viewCurrency, today = new Date()) {
+  const profile = store.profile;
+  const vc = viewCurrency || profile?.currency || "TTD";
   const periods = btPeriodBounds(today);
   const out = {};
+  let hasUnconverted = false;
   for (const key of ["week", "month", "ytd"]) {
     const { start, end } = periods[key];
-    const income = btSumInRange(store.income, "entry_date", start, end);
-    const expenses = btSumInRange(store.expenses, "expense_date", start, end);
-    out[key] = { income, expenses, net: income - expenses };
+    const inc = btSumIncomeInRange(store.income, start, end, vc, profile);
+    const exp = btSumExpensesInRange(store.expenses, start, end, vc, profile);
+    if (inc.unconverted || exp.unconverted) hasUnconverted = true;
+    out[key] = { income: inc.total, expenses: exp.total, net: inc.total - exp.total, start, end };
   }
-  const annualIncomeEstimate = btEstimateAnnualIncome(store, today);
-  const targetPct = store.profile?.annual_savings_target_pct ?? 0.20;
+  const annualIncomeEstimate = btEstimateAnnualIncome(store, vc, today);
+  const targetPct = profile?.annual_savings_target_pct ?? 0.20;
   const annualSavingsTarget = annualIncomeEstimate * targetPct;
-  const ytdSavingsActual = store.expenses
-    .filter((e) => e.category === "Savings & Investments" && btDateInRange(e.expense_date, periods.ytd.start, periods.ytd.end))
-    .reduce((s, e) => s + Number(e.amount), 0);
+  const ytdSavingsActual = btSumExpenseCategoryInRange(store.expenses, "Savings & Investments", periods.ytd.start, periods.ytd.end, vc, profile);
 
-  return { periods: out, annualIncomeEstimate, annualSavingsTarget, ytdSavingsActual, targetPct };
+  return { viewCurrency: vc, hasUnconverted, periods: out, annualIncomeEstimate, annualSavingsTarget, ytdSavingsActual, targetPct };
 }
 
 function btGoalProgress(store) {
@@ -266,6 +342,11 @@ function btHealthFlags(store, summary) {
   const flags = [];
   const monthNet = summary.periods.month.net;
   const monthIncome = summary.periods.month.income;
+  const vc = summary.viewCurrency;
+
+  if (summary.hasUnconverted) {
+    flags.push({ level: "yellow", text: "Some entries are in a currency without an exchange rate set — these numbers may be incomplete. Add rates in Settings." });
+  }
 
   if (monthIncome > 0) {
     const netPct = monthNet / monthIncome;
@@ -273,13 +354,12 @@ function btHealthFlags(store, summary) {
     else if (netPct < T.cashFlowYellowPct) flags.push({ level: "yellow", text: "What's left over this month is thin (under 5% of income)." });
     else if (netPct >= T.cashFlowGreenPct) flags.push({ level: "green", text: "Healthy surplus this month — on track." });
 
-    const debtThisMonth = btSumInRange(store.expenses, "expense_date", summary.periods.month.start, summary.periods.month.end);
-    const debtPaid = store.expenses.filter((e) => e.category === "Debt Repayment" && btDateInRange(e.expense_date, summary.periods.month.start, summary.periods.month.end)).reduce((s, e) => s + Number(e.amount), 0);
+    const debtPaid = btSumExpenseCategoryInRange(store.expenses, "Debt Repayment", summary.periods.month.start, summary.periods.month.end, vc, store.profile);
     const debtRatio = debtPaid / monthIncome;
     if (debtRatio > T.debtRatioRed) flags.push({ level: "red", text: "Debt payments are over 40% of income this month." });
     else if (debtRatio > T.debtRatioYellow) flags.push({ level: "yellow", text: "Debt payments are 20–40% of income this month." });
 
-    const housingPaid = store.expenses.filter((e) => e.category === "Housing" && btDateInRange(e.expense_date, summary.periods.month.start, summary.periods.month.end)).reduce((s, e) => s + Number(e.amount), 0);
+    const housingPaid = btSumExpenseCategoryInRange(store.expenses, "Housing", summary.periods.month.start, summary.periods.month.end, vc, store.profile);
     if (housingPaid / monthIncome > T.housingRatioRed) flags.push({ level: "red", text: "Housing costs are over 30% of income this month." });
   }
 

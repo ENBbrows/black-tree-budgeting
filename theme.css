@@ -153,4 +153,31 @@ input:focus, select:focus, textarea:focus {
   .bt-dash-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; align-items: start; }
 }
 
+/* ── Field help bubbles ── */
+label[data-tip] { display: flex; align-items: center; gap: 6px; }
+label[data-tip]::after {
+  content: "?"; display: inline-flex; align-items: center; justify-content: center;
+  width: 15px; height: 15px; border-radius: 50%; background: var(--bt-border); color: var(--bt-muted);
+  font-size: 0.68rem; font-weight: 700; flex: none;
+}
+.bt-tip-bubble {
+  position: fixed; z-index: 90; max-width: 280px;
+  background: var(--bt-ink); color: var(--bt-cream);
+  border-radius: 10px; padding: 12px 14px 10px;
+  font-size: 0.83rem; line-height: 1.45;
+  box-shadow: 0 8px 24px rgba(34, 30, 31, 0.25);
+  animation: bt-tip-in .12s ease-out;
+}
+@keyframes bt-tip-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+.bt-tip-bubble p { margin: 0 22px 8px 0; color: var(--bt-cream); }
+.bt-tip-close {
+  position: absolute; top: 6px; right: 8px; background: none; border: none; cursor: pointer;
+  color: var(--bt-cream); opacity: 0.6; font-size: 1.1rem; line-height: 1; padding: 4px;
+}
+.bt-tip-close:hover { opacity: 1; }
+.bt-tip-hide-all {
+  background: none; border: none; cursor: pointer; padding: 0;
+  color: var(--bt-gold-light); font-size: 0.74rem; text-decoration: underline; font-family: inherit;
+}
+
 ::selection { background: var(--bt-gold-light); }

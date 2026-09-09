@@ -32,7 +32,7 @@
   <div class="bt-card" style="text-align:left">
     <h1 style="text-align:center">Sign in</h1>
     <p class="bt-sub" style="text-align:center">We'll email you a secure one-time link — no password to remember or share.</p>
-    <label for="bt-email">Email address</label>
+    <label for="bt-email" data-tip="The email you'll use to sign in — we'll send a secure link here. No password needed.">Email address</label>
     <input id="bt-email" type="email" inputmode="email" autocomplete="email" placeholder="you@email.com" />
     <button class="bt-btn bt-btn--gold" id="bt-send" style="margin-top:18px">Send secure link</button>
     <div id="bt-status"></div>
@@ -48,6 +48,7 @@
 <script src="config.js"></script>
 <script src="auth.js"></script>
 <script src="store.js"></script>
+<script src="tips.js"></script>
 <script>
   (async function () {
     // Already have a session on this device? Skip straight through.
