@@ -16,6 +16,12 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="theme.css" />
+<style>
+  #scan-status { font-size: 0.82rem; color: var(--bt-muted); margin: 8px 0 0; display: none; }
+  #scan-status.show { display: block; }
+  #category-hint { font-size: 0.76rem; color: var(--bt-gold); margin: -12px 0 12px; display: none; }
+  #category-hint.show { display: block; }
+</style>
 </head>
 <body>
 <div class="bt-header">
@@ -27,16 +33,15 @@
     <h1>Expense Tracker</h1>
     <span id="bt-net-badge" class="bt-badge bt-badge--online">Online</span>
   </div>
-  <p class="bt-sub">Log spending as it happens. Saves instantly, even with no signal.</p>
+  <p class="bt-sub">Say what it was and how much — we'll sort out the category. Saves instantly, even with no signal.</p>
+
+  <button class="bt-btn bt-btn--ghost" id="scan-btn" style="margin-bottom:16px">📷 Scan a bill or receipt</button>
+  <input type="file" id="scan-file" accept="image/*" capture="environment" style="display:none" />
+  <p id="scan-status"></p>
 
   <div class="bt-card">
-    <label for="f-category" data-tip="What kind of spending this is. Pick Debt Repayment or Savings & Investments if you want it to count toward a goal or debt below.">Category</label>
-    <select id="f-category"></select>
-
-    <div id="link-wrap" style="display:none">
-      <label for="f-link" data-tip="Optional — pick a goal or debt to automatically add this amount to its progress.">Apply toward <span style="font-weight:400;color:var(--bt-muted)">(optional)</span></label>
-      <select id="f-link"><option value="">— none —</option></select>
-    </div>
+    <label for="f-desc" data-tip="What was this for? Examples: &quot;Rent&quot;, &quot;KFC lunch&quot;, &quot;T&amp;TEC bill&quot;, &quot;Netflix&quot;. We'll guess the category from this.">What was it for?</label>
+    <input id="f-desc" type="text" placeholder="e.g. Grocery run at Massy Stores" />
 
     <div class="bt-field-row">
       <div>
@@ -49,8 +54,14 @@
       </div>
     </div>
 
-    <label for="f-notes" data-tip="Anything extra worth remembering. Examples: &quot;Weekly grocery run&quot;, &quot;Car insurance premium&quot;, &quot;Split with roommate&quot;. Totally optional.">Notes <span style="font-weight:400;color:var(--bt-muted)">(optional)</span></label>
-    <input id="f-notes" type="text" placeholder="" />
+    <label for="f-category" data-tip="What kind of spending this is — we guess this from what you typed above, but change it any time. Pick Debt Repayment or Savings & Investments if you want it to count toward a goal or debt below.">Category</label>
+    <select id="f-category"></select>
+    <p id="category-hint">Guessed from what you typed — change it if that's not right.</p>
+
+    <div id="link-wrap" style="display:none">
+      <label for="f-link" data-tip="Optional — pick a goal or debt to automatically add this amount to its progress.">Apply toward <span style="font-weight:400;color:var(--bt-muted)">(optional)</span></label>
+      <select id="f-link"><option value="">— none —</option></select>
+    </div>
 
     <button class="bt-btn bt-btn--gold" id="f-submit" style="margin-top:18px">Save expense</button>
   </div>
@@ -74,6 +85,7 @@
 <script src="tips.js"></script>
 <script>
   let btUid = null;
+  let categoryManuallySet = false;
 
   function toast(msg) {
     const el = document.getElementById("bt-toast");
@@ -105,8 +117,8 @@
     wrap.innerHTML = rows.map((r) => `
       <div class="bt-list-row">
         <div>
-          <div>${r.category}${r._pending ? '<span class="bt-pending-dot" title="Syncing"></span>' : ""}</div>
-          <div class="meta">${r.expense_date}${r.notes ? " · " + r.notes : ""}</div>
+          <div>${r.notes || r.category}${r._pending ? '<span class="bt-pending-dot" title="Syncing"></span>' : ""}</div>
+          <div class="meta">${r.category} · ${r.expense_date}</div>
         </div>
         <div class="amt">${fmtMoney(r.amount)}</div>
       </div>
@@ -133,6 +145,61 @@
     }
   }
 
+  function tryAutoGuessCategory() {
+    const desc = document.getElementById("f-desc").value;
+    if (!desc.trim()) { categoryManuallySet = false; document.getElementById("category-hint").classList.remove("show"); return; }
+    if (categoryManuallySet) return;
+    const guess = btGuessCategory(desc);
+    if (guess) {
+      document.getElementById("f-category").value = guess;
+      document.getElementById("category-hint").classList.add("show");
+      updateLinkOptions();
+    }
+  }
+
+  let scanLib = null;
+  async function loadScanLib() {
+    if (scanLib) return scanLib;
+    await new Promise((resolve, reject) => {
+      const s = document.createElement("script");
+      s.src = "https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js";
+      s.onload = resolve;
+      s.onerror = reject;
+      document.head.appendChild(s);
+    });
+    scanLib = window.Tesseract;
+    return scanLib;
+  }
+
+  async function handleScanFile(file) {
+    const statusEl = document.getElementById("scan-status");
+    statusEl.classList.add("show");
+    statusEl.textContent = "Loading scanner…";
+    try {
+      const Tesseract = await loadScanLib();
+      statusEl.textContent = "Reading bill… this can take a moment.";
+      const { data } = await Tesseract.recognize(file, "eng", {
+        logger: (m) => { if (m.status === "recognizing text") statusEl.textContent = `Reading bill… ${Math.round((m.progress || 0) * 100)}%`; }
+      });
+      const text = data.text || "";
+      const amount = btGuessAmountFromText(text);
+      const category = btGuessCategory(text);
+      if (amount) document.getElementById("f-amount").value = amount.toFixed(2);
+      if (category) {
+        document.getElementById("f-category").value = category;
+        categoryManuallySet = true; // trust the scan over further auto-guessing from the description field
+        document.getElementById("category-hint").classList.add("show");
+      }
+      updateLinkOptions();
+      statusEl.textContent = amount
+        ? "Got it — double-check the amount and category below before saving."
+        : "Couldn't find a clear total — fill in the amount yourself; category guess (if any) is below.";
+    } catch (err) {
+      console.error("Black Tree bill scan failed", err);
+      statusEl.textContent = "Couldn't read that image — enter the details manually below.";
+    }
+  }
+
   async function init() {
     const user = await btRequireAuth();
     if (!user) return;
@@ -141,7 +208,16 @@
     document.getElementById("f-date").value = new Date().toISOString().slice(0, 10);
     const catSel = document.getElementById("f-category");
     catSel.innerHTML = BT_CONFIG.EXPENSE_CATEGORIES.map((c) => `<option value="${c}">${c}</option>`).join("");
-    catSel.addEventListener("change", updateLinkOptions);
+    catSel.addEventListener("change", () => { categoryManuallySet = true; document.getElementById("category-hint").classList.remove("show"); updateLinkOptions(); });
+
+    document.getElementById("f-desc").addEventListener("input", tryAutoGuessCategory);
+
+    document.getElementById("scan-btn").addEventListener("click", () => document.getElementById("scan-file").click());
+    document.getElementById("scan-file").addEventListener("change", (e) => {
+      const file = e.target.files[0];
+      if (file) handleScanFile(file);
+      e.target.value = "";
+    });
 
     updateNetBadge();
     renderRecent();
@@ -149,13 +225,14 @@
     btSync(btUid).then(() => { renderRecent(); updateLinkOptions(); });
 
     document.getElementById("f-submit").addEventListener("click", () => {
+      const notes = document.getElementById("f-desc").value.trim() || null;
       const category = catSel.value;
       const amount = parseFloat(document.getElementById("f-amount").value);
       const expense_date = document.getElementById("f-date").value;
-      const notes = document.getElementById("f-notes").value.trim() || null;
       const linkSel = document.getElementById("f-link");
       const linkId = linkSel.value || null;
 
+      if (!notes) return toast("Say what this was for.");
       if (!amount || amount <= 0) return toast("Enter a valid amount.");
       if (!expense_date) return toast("Pick a date.");
 
@@ -167,8 +244,11 @@
       renderRecent();
       toast(navigator.onLine ? "Expense saved" : "Saved offline — will sync automatically");
 
+      document.getElementById("f-desc").value = "";
       document.getElementById("f-amount").value = "";
-      document.getElementById("f-notes").value = "";
+      document.getElementById("scan-status").classList.remove("show");
+      document.getElementById("category-hint").classList.remove("show");
+      categoryManuallySet = false;
     });
 
     if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});

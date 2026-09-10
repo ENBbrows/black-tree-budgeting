@@ -44,6 +44,29 @@ const BT_CONFIG = {
 
   GOAL_CATEGORIES: ["Debt Reduction", "Investing", "Education", "Emergency Fund", "Personal", "Other"],
 
+  /* Categories treated as "cost of living" — the baseline that has to keep
+     running no matter what. Everything else (Personal, Education, Other)
+     counts as discretionary. Used for the Cost of Living / Disposable
+     Income breakdown, not stored per-client — the same split for everyone. */
+  ESSENTIAL_CATEGORIES: ["Housing", "Utilities", "Transport", "Food", "Insurance", "Debt Repayment"],
+
+  /* Auto-categorization: as a client types what an expense was for (or a
+     scanned bill's text), the first category whose keyword appears in that
+     text (case-insensitive) is pre-selected — so the client just describes
+     the spend instead of hunting through a dropdown first. Always shown as
+     an editable guess, never applied silently. */
+  CATEGORY_KEYWORDS: {
+    "Housing": ["rent", "mortgage", "landlord", "hoa"],
+    "Utilities": ["electricity", "t&tec", "ttec", "water", "wasa", "internet", "flow", "digicel", "phone bill", "gas bill"],
+    "Transport": ["gas", "fuel", "petrol", "uber", "taxi", "maxi", "car repair", "parking", "car service", "registration"],
+    "Food": ["grocery", "groceries", "supermarket", "restaurant", "lunch", "dinner", "takeout", "take-out", "kfc", "subway", "market"],
+    "Insurance": ["insurance", "premium"],
+    "Debt Repayment": ["loan payment", "car loan", "credit card payment", "mortgage payment", "loan installment"],
+    "Savings & Investments": ["savings", "investment", "mutual fund", "stocks", "utc", "deposit"],
+    "Education": ["school", "tuition", "textbook", "books", "course", "exam fee"],
+    "Personal": ["netflix", "spotify", "gym", "haircut", "salon", "shopping", "clothes", "subscription"]
+  },
+
   /* Health-check thresholds — pulled directly from the Blacktree Financial
      Services 12-Month Tracking Tool's own guideline sheets, just applied
      live instead of read off a spreadsheet. */

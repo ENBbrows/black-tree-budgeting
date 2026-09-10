@@ -40,7 +40,7 @@ body {
 a { color: var(--bt-gold); }
 
 .bt-container { max-width: 480px; margin: 0 auto; padding: 20px 18px 96px; }
-.bt-container--wide { max-width: 1080px; padding: 24px 24px 64px; }
+.bt-container--wide { max-width: 1080px; padding: 24px 24px 96px; }
 
 .bt-header {
   display: flex; align-items: center; justify-content: center;
@@ -179,5 +179,26 @@ label[data-tip]::after {
   background: none; border: none; cursor: pointer; padding: 0;
   color: var(--bt-gold-light); font-size: 0.74rem; text-decoration: underline; font-family: inherit;
 }
+
+.bt-onboard-card {
+  background: var(--bt-ink); color: var(--bt-cream); border-radius: var(--bt-radius);
+  padding: 18px 20px; margin-bottom: 16px; box-shadow: var(--bt-shadow);
+}
+.bt-onboard-card h2 { color: var(--bt-white); }
+.bt-onboard-card p { color: var(--bt-cream); opacity: 0.85; }
+.bt-onboard-card .bt-btn { width: auto; }
+
+.bt-quick-actions { display: flex; gap: 10px; margin: 14px 0 18px; flex-wrap: wrap; }
+.bt-quick-actions a { flex: 1; min-width: 160px; text-decoration: none; }
+
+.bt-card h2 { display: flex; align-items: center; gap: 8px; }
+.bt-status-dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+.bt-status-dot--green { background: var(--bt-green); }
+.bt-status-dot--yellow { background: var(--bt-yellow); }
+.bt-status-dot--red { background: var(--bt-red); }
+
+.bt-bill-item { display: flex; align-items: center; justify-content: space-between; padding: 11px 0; border-bottom: 1px solid var(--bt-border); gap: 10px; }
+.bt-bill-item:last-child { border-bottom: none; }
+.bt-bill-item .meta { font-size: 0.78rem; color: var(--bt-muted); }
 
 ::selection { background: var(--bt-gold-light); }

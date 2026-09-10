@@ -14,7 +14,7 @@ const btStoreKey = (uid) => `bt_store_${uid}`;
 const btQueueKey = (uid) => `bt_queue_${uid}`;
 
 function btEmptyStore() {
-  return { profile: null, goals: [], liabilities: [], income: [], expenses: [], syncedAt: null };
+  return { profile: null, goals: [], liabilities: [], bills: [], income: [], expenses: [], syncedAt: null };
 }
 
 function btLoadStore(uid) {
@@ -43,7 +43,8 @@ const BT_TABLE_TO_STORE_KEY = {
   bt_income_entries: "income",
   bt_expense_entries: "expenses",
   bt_goals: "goals",
-  bt_liabilities: "liabilities"
+  bt_liabilities: "liabilities",
+  bt_recurring_bills: "bills"
 };
 
 /**
@@ -77,8 +78,10 @@ const btAddIncome = (uid, payload) => btQueueWrite(uid, "bt_income_entries", "in
 const btAddExpense = (uid, payload) => btQueueWrite(uid, "bt_expense_entries", "insert", payload);
 const btAddGoal = (uid, payload) => btQueueWrite(uid, "bt_goals", "insert", payload);
 const btAddLiability = (uid, payload) => btQueueWrite(uid, "bt_liabilities", "insert", payload);
+const btAddBill = (uid, payload) => btQueueWrite(uid, "bt_recurring_bills", "insert", payload);
 const btUpdateGoal = (uid, id, payload) => btQueueWrite(uid, "bt_goals", "update", payload, id);
 const btUpdateLiability = (uid, id, payload) => btQueueWrite(uid, "bt_liabilities", "update", payload, id);
+const btUpdateBill = (uid, id, payload) => btQueueWrite(uid, "bt_recurring_bills", "update", payload, id);
 const btDeleteEntry = (uid, table, id) => btQueueWrite(uid, table, "delete", null, id);
 
 /** bt_profiles is a single object per user, not an array — handled separately from btQueueWrite. */
@@ -119,6 +122,7 @@ async function btSync(uid) {
       let payload = job.payload;
       if (payload && payload.goal_id && idMap[payload.goal_id]) payload = { ...payload, goal_id: idMap[payload.goal_id] };
       if (payload && payload.liability_id && idMap[payload.liability_id]) payload = { ...payload, liability_id: idMap[payload.liability_id] };
+      if (payload && payload.bill_id && idMap[payload.bill_id]) payload = { ...payload, bill_id: idMap[payload.bill_id] };
 
       try {
         if (job.op === "insert") {
@@ -163,10 +167,11 @@ async function btPullSnapshot(uid) {
   twoYearsAgo.setFullYear(twoYearsAgo.getFullYear() - 2);
   const since = twoYearsAgo.toISOString().slice(0, 10);
 
-  const [profileRes, goalsRes, liabilitiesRes, incomeRes, expenseRes] = await Promise.all([
+  const [profileRes, goalsRes, liabilitiesRes, billsRes, incomeRes, expenseRes] = await Promise.all([
     btSupabase.from("bt_profiles").select("*").eq("id", uid).single(),
     btSupabase.from("bt_goals").select("*").eq("user_id", uid).order("created_at", { ascending: false }),
     btSupabase.from("bt_liabilities").select("*").eq("user_id", uid).order("created_at", { ascending: false }),
+    btSupabase.from("bt_recurring_bills").select("*").eq("user_id", uid).order("day_of_month", { ascending: true }),
     btSupabase.from("bt_income_entries").select("*").eq("user_id", uid).gte("entry_date", since).order("entry_date", { ascending: false }),
     btSupabase.from("bt_expense_entries").select("*").eq("user_id", uid).gte("expense_date", since).order("expense_date", { ascending: false })
   ]);
@@ -175,6 +180,7 @@ async function btPullSnapshot(uid) {
     profile: profileRes.data || null,
     goals: goalsRes.data || [],
     liabilities: liabilitiesRes.data || [],
+    bills: billsRes.data || [],
     income: incomeRes.data || [],
     expenses: expenseRes.data || [],
     syncedAt: new Date().toISOString()
@@ -203,6 +209,45 @@ function btSumInRange(entries, dateField, start, end) {
 
 /* ── Multi-currency: every rate is manual (client-set in Settings), never
    fetched live, so conversion works fully offline like everything else. ── */
+
+/**
+ * Guesses an expense category from free text (what the client typed, or
+ * OCR'd bill text) via simple keyword matching — always a starting point
+ * to confirm or change, never applied without the client seeing it.
+ * Returns null if nothing matched.
+ */
+function btGuessCategory(text) {
+  if (!text) return null;
+  const lower = text.toLowerCase();
+  const dict = (typeof BT_CONFIG !== "undefined" && BT_CONFIG.CATEGORY_KEYWORDS) || {};
+  for (const [category, keywords] of Object.entries(dict)) {
+    if (keywords.some((k) => lower.includes(k))) return category;
+  }
+  return null;
+}
+
+/**
+ * Pulls the most likely total amount out of OCR'd receipt/bill text.
+ * Prefers a number on a line mentioning "total"/"amount due"/"balance";
+ * falls back to the largest currency-looking number found anywhere.
+ */
+function btGuessAmountFromText(text) {
+  if (!text) return null;
+  const numRe = /(\d{1,3}(?:[,.]\d{3})*(?:\.\d{2})?)/g;
+  const lines = text.split(/\r?\n/);
+  // \btotal\b (not "amount due"/"balance due") deliberately excludes "Subtotal" —
+  // searching from the bottom favors the grand total over any subtotal line above it.
+  const keywordRe = /\btotal\b|amount due|balance due/i;
+  const keywordLine = [...lines].reverse().find((l) => keywordRe.test(l));
+  const parseNums = (s) => (s.match(numRe) || []).map((n) => parseFloat(n.replace(/,/g, ""))).filter((n) => !isNaN(n) && n > 0);
+
+  if (keywordLine) {
+    const nums = parseNums(keywordLine);
+    if (nums.length) return Math.max(...nums);
+  }
+  const allNums = parseNums(text);
+  return allNums.length ? Math.max(...allNums) : null;
+}
 
 /** Currencies a client can pick from: their home currency first, then the configured extras. */
 function btCurrencyOptions(profile) {
@@ -336,6 +381,32 @@ function btLiabilityProgress(store) {
   });
 }
 
+/** Each active recurring bill, with whether it's already been logged (paid) this month. */
+function btBillsStatus(store, today = new Date()) {
+  const { month } = btPeriodBounds(today);
+  return store.bills
+    .filter((b) => b.active !== false)
+    .map((b) => {
+      const paidEntry = store.expenses.find((e) => e.bill_id === b.id && btDateInRange(e.expense_date, month.start, month.end));
+      return { ...b, paidThisMonth: !!paidEntry, paidAmount: paidEntry ? Number(paidEntry.amount) : null };
+    })
+    .sort((a, b) => a.day_of_month - b.day_of_month);
+}
+
+/** Cost of living = essential-category spending in range, converted into viewCurrency. */
+function btCostOfLiving(store, start, end, viewCurrency, profile) {
+  const essentials = (typeof BT_CONFIG !== "undefined" && BT_CONFIG.ESSENTIAL_CATEGORIES) || [];
+  return essentials.reduce((s, cat) => s + btSumExpenseCategoryInRange(store.expenses, cat, start, end, viewCurrency, profile), 0);
+}
+
+/** What's left after essentials AND what's already been put toward savings/investing — the money actually free to allocate further. */
+function btDisposableIncome(store, summary) {
+  const costOfLiving = btCostOfLiving(store, summary.periods.month.start, summary.periods.month.end, summary.viewCurrency, store.profile);
+  const savedThisMonth = btSumExpenseCategoryInRange(store.expenses, "Savings & Investments", summary.periods.month.start, summary.periods.month.end, summary.viewCurrency, store.profile);
+  const disposable = summary.periods.month.income - costOfLiving - savedThisMonth;
+  return { costOfLiving, savedThisMonth, disposable };
+}
+
 /** Red/Yellow/Green health flags, thresholds straight from the source spreadsheet's guideline sheets. */
 function btHealthFlags(store, summary) {
   const T = BT_CONFIG.THRESHOLDS;
@@ -368,6 +439,22 @@ function btHealthFlags(store, summary) {
     if (rate >= T.savingsRateGreen) flags.push({ level: "green", text: "Savings rate is 20%+ of income — on track for financial independence." });
     else if (rate >= T.savingsRateYellow) flags.push({ level: "yellow", text: "Savings rate is 10–20% of income." });
     else flags.push({ level: "red", text: "Savings rate is under 10% of income — book a consultation." });
+  }
+
+  const budgets = store.profile?.category_budgets || {};
+  Object.entries(budgets).forEach(([cat, limit]) => {
+    if (!limit || limit <= 0) return;
+    const spent = btSumExpenseCategoryInRange(store.expenses, cat, summary.periods.month.start, summary.periods.month.end, vc, store.profile);
+    const pct = spent / limit;
+    if (pct > 1) flags.push({ level: "red", text: `${cat} is over budget this month (${Math.round(pct * 100)}% of what you set).` });
+    else if (pct > 0.85) flags.push({ level: "yellow", text: `${cat} is close to its monthly budget (${Math.round(pct * 100)}% used).` });
+  });
+
+  if (monthIncome > 0) {
+    const { disposable } = btDisposableIncome(store, summary);
+    if (disposable > 0 && disposable / monthIncome >= 0.10) {
+      flags.push({ level: "green", text: `You have disposable income this month beyond essentials and savings — a chance to invest more or top up a goal.` });
+    }
   }
 
   return flags;

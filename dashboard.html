@@ -56,7 +56,14 @@
     </div>
   </div>
 
-  <div id="bt-flags" style="margin-top:16px"></div>
+  <div id="bt-onboard" style="display:none"></div>
+
+  <div class="bt-quick-actions">
+    <a href="income.html" class="bt-btn bt-btn--gold">+ Log Income</a>
+    <a href="expense.html" class="bt-btn bt-btn--ghost">+ Log Expense</a>
+  </div>
+
+  <div id="bt-flags"></div>
 
   <div class="bt-dash-grid">
     <div>
@@ -71,6 +78,26 @@
       <div class="bt-card">
         <h2>Year to Date</h2>
         <div class="bt-stat-grid" id="stats-ytd"></div>
+      </div>
+
+      <div class="bt-card" id="bills-card">
+        <div class="bt-section-head" style="margin:0 0 6px">
+          <h2>Bills This Month</h2>
+          <button class="bt-btn bt-btn--ghost bt-btn--sm" id="toggle-bill-form">+ Add bill</button>
+        </div>
+        <p class="bt-sub" style="margin-bottom:10px">Set up a bill once, then mark it paid each month in one tap — no re-typing rent every time.</p>
+        <div id="bills-list"><div class="bt-empty">No recurring bills set up yet.</div></div>
+        <div class="bt-mini-form" id="bill-form">
+          <label data-tip="e.g. &quot;Rent&quot;, &quot;Phone plan&quot;, &quot;Netflix&quot;.">Bill name</label>
+          <input id="b-name" type="text" placeholder="e.g. Rent" />
+          <div class="bt-field-row">
+            <div><label data-tip="What category this bill falls under.">Category</label><select id="b-category"></select></div>
+            <div><label data-tip="The usual amount, e.g. 2000.00.">Amount</label><input id="b-amount" type="number" min="0" step="0.01" /></div>
+          </div>
+          <label data-tip="Which day of the month it's usually due (1–28). Just for sorting the list, doesn't set a reminder.">Day of month due</label>
+          <input id="b-day" type="number" min="1" max="28" value="1" />
+          <button class="bt-btn bt-btn--gold" id="b-submit" style="margin-top:14px">Save bill</button>
+        </div>
       </div>
 
       <div class="bt-card" id="currency-breakdown-card" style="display:none">
@@ -92,12 +119,18 @@
 
     <div>
       <div class="bt-card">
-        <h2>Savings Target</h2>
+        <h2><span class="bt-status-dot" id="savings-dot"></span>Savings Target</h2>
         <p class="bt-sub" id="savings-sub" style="margin-bottom:10px">—</p>
         <div class="bt-progress"><div id="savings-bar" style="width:0%"></div></div>
         <div style="display:flex;justify-content:space-between;font-size:0.8rem;color:var(--bt-muted);margin-top:6px">
           <span id="savings-actual"></span><span id="savings-target"></span>
         </div>
+      </div>
+
+      <div class="bt-card">
+        <h2 data-tip="Cost of Living = your essential spending (Housing, Utilities, Transport, Food, Insurance, Debt Repayment) this month. Disposable Income = what's left after essentials AND after this month's savings contributions — money genuinely free to invest further or add to a goal.">Cost of Living & Disposable Income</h2>
+        <div class="bt-stat-grid" id="col-stats" style="grid-template-columns:1fr 1fr"></div>
+        <p class="bt-sub" id="col-note" style="margin:10px 0 0"></p>
       </div>
 
       <div class="bt-card" id="goals-card">
@@ -150,9 +183,17 @@
           <div><label data-tip="The currency label shown next to your numbers, e.g. TTD, USD.">Currency</label><input id="s-currency" type="text" maxlength="6" /></div>
           <div><label data-tip="What percent of your income you're aiming to save each year. 20% is a good target for long-term financial independence.">Annual savings target</label><input id="s-target" type="number" min="0" max="100" step="1" /></div>
         </div>
+        <label data-tip="How many people your income supports (yourself included) — just a headcount, used to give the Cost of Living figures context. Doesn't affect any calculation.">Dependents</label>
+        <input id="s-dependents" type="number" min="0" step="1" style="max-width:120px" />
+
         <div id="fx-rates-wrap" style="margin-top:16px;padding-top:14px;border-top:1px dashed var(--bt-border)">
           <label style="margin:0 0 8px" data-tip="Manual exchange rates for any foreign currency you log income in — set once, updated whenever you like. Nothing is fetched automatically, so this keeps working offline.">Exchange rates</label>
           <div id="fx-rates-list"></div>
+        </div>
+
+        <div id="budgets-wrap" style="margin-top:16px;padding-top:14px;border-top:1px dashed var(--bt-border)">
+          <label style="margin:0 0 8px" data-tip="Optional monthly ceiling per category. Leave blank for no limit. When you're close to or over one, it'll show up as a flag above and a color on Spending by Category.">Category budgets <span style="font-weight:400;color:var(--bt-muted)">(optional)</span></label>
+          <div id="budgets-list"></div>
         </div>
 
         <button class="bt-btn bt-btn--ghost" id="s-save" style="margin-top:14px">Save settings</button>
@@ -168,6 +209,12 @@
 </div>
 
 <div class="bt-toast" id="bt-toast"></div>
+
+<nav class="bt-bottom-nav">
+  <a href="income.html">Income</a>
+  <a href="expense.html">Expense</a>
+  <a href="dashboard.html" class="active">Dashboard</a>
+</nav>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="config.js"></script>
@@ -216,12 +263,21 @@
     `;
   }
 
-  function renderSavings(summary) {
+  function renderSavings(summary, today = new Date()) {
     document.getElementById("savings-sub").textContent = `Target ${fmtPct(summary.targetPct)} of an estimated ${fmtMoney(summary.annualIncomeEstimate)} annual income.`;
     const pct = summary.annualSavingsTarget > 0 ? Math.min(1, summary.ytdSavingsActual / summary.annualSavingsTarget) : 0;
     document.getElementById("savings-bar").style.width = (pct * 100) + "%";
     document.getElementById("savings-actual").textContent = fmtMoney(summary.ytdSavingsActual) + " saved YTD";
     document.getElementById("savings-target").textContent = "Target " + fmtMoney(summary.annualSavingsTarget) + "/yr";
+
+    // On-track glance: compare YTD savings progress to how far through the year we are.
+    const dayOfYear = Math.ceil((today - new Date(today.getFullYear(), 0, 0)) / 86400000);
+    const yearFraction = dayOfYear / 365;
+    const dot = document.getElementById("savings-dot");
+    if (summary.annualSavingsTarget <= 0) { dot.className = "bt-status-dot"; }
+    else if (pct >= yearFraction) dot.className = "bt-status-dot bt-status-dot--green";
+    else if (pct >= yearFraction * 0.7) dot.className = "bt-status-dot bt-status-dot--yellow";
+    else dot.className = "bt-status-dot bt-status-dot--red";
   }
 
   function renderGoals(store) {
@@ -298,6 +354,7 @@
   function renderCategoryBreakdown(store) {
     const { month } = btPeriodBounds();
     const home = homeCurrency();
+    const budgets = store.profile?.category_budgets || {};
     const inMonth = store.expenses.filter((e) => btDateInRange(e.expense_date, month.start, month.end));
     const wrap = document.getElementById("chart-category-wrap");
     if (!inMonth.length) { wrap.innerHTML = '<div class="bt-empty">No expenses logged this month yet.</div>'; return; }
@@ -308,12 +365,19 @@
     });
     const total = Object.values(totals).reduce((a, b) => a + b, 0);
     const rows = Object.entries(totals).sort((a, b) => b[1] - a[1]);
-    wrap.innerHTML = rows.map(([cat, amt]) => `
+    wrap.innerHTML = rows.map(([cat, amt]) => {
+      const rawAmt = inMonth.filter((e) => e.category === cat).reduce((s, e) => s + Number(e.amount), 0);
+      const budget = budgets[cat];
+      const overBudget = budget > 0 && rawAmt > budget;
+      const nearBudget = budget > 0 && rawAmt > budget * 0.85 && !overBudget;
+      const barColor = overBudget ? "var(--bt-red)" : nearBudget ? "var(--bt-yellow)" : "var(--bt-gold)";
+      const budgetNote = budget > 0 ? ` · ${fmtHome(rawAmt)} of ${fmtHome(budget)} budget` : "";
+      return `
       <div style="margin-bottom:10px">
-        <div style="display:flex;justify-content:space-between;font-size:0.85rem;margin-bottom:4px"><span>${cat}</span><span>${fmtMoney(amt)} · ${Math.round(amt / total * 100)}%</span></div>
-        <div class="bt-progress"><div style="width:${(amt / total) * 100}%"></div></div>
-      </div>
-    `).join("");
+        <div style="display:flex;justify-content:space-between;font-size:0.85rem;margin-bottom:4px"><span>${cat}</span><span>${fmtMoney(amt)} · ${Math.round(amt / total * 100)}%${budgetNote}</span></div>
+        <div class="bt-progress"><div style="width:${(amt / total) * 100}%;background:${barColor}"></div></div>
+      </div>`;
+    }).join("");
   }
 
   function renderCurrencyBreakdown(store) {
@@ -354,10 +418,93 @@
     `).join("");
   }
 
+  function renderOnboard(store) {
+    const el = document.getElementById("bt-onboard");
+    if (readOnly || (store.income.length && store.goals.length)) { el.style.display = "none"; return; }
+    el.style.display = "block";
+    const needsIncome = !store.income.length;
+    const needsGoal = !store.goals.length;
+    let ask = "Let's get you set up.";
+    if (needsIncome && needsGoal) ask = "Let's get you set up — add your steady income (and any side hustle income), then set a savings goal.";
+    else if (needsIncome) ask = "Don't forget to log your income — steady job, side hustle, anything that comes in — so your numbers below mean something.";
+    else if (needsGoal) ask = "Have something you're saving toward? Set a goal so you can track progress.";
+    el.innerHTML = `
+      <div class="bt-onboard-card">
+        <h2>Welcome to Black Tree Budgeting</h2>
+        <p style="margin-bottom:14px">${ask}</p>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          ${needsIncome ? '<a href="income.html" class="bt-btn bt-btn--gold" style="text-decoration:none">Log income →</a>' : ""}
+          ${needsGoal ? '<button class="bt-btn bt-btn--ghost" id="onboard-add-goal" style="background:transparent;border-color:var(--bt-cream);color:var(--bt-cream)">+ Add a goal</button>' : ""}
+        </div>
+      </div>`;
+    const goalBtn = document.getElementById("onboard-add-goal");
+    if (goalBtn) goalBtn.addEventListener("click", () => {
+      document.getElementById("goal-form").classList.add("show");
+      document.getElementById("goal-form").scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+  }
+
+  function renderBills(store) {
+    const bills = btBillsStatus(store);
+    const wrap = document.getElementById("bills-list");
+    if (!bills.length) { wrap.innerHTML = '<div class="bt-empty">No recurring bills set up yet.</div>'; return; }
+    wrap.innerHTML = bills.map((b) => `
+      <div class="bt-bill-item">
+        <div>
+          <div>${b.name}${b._pending ? '<span class="bt-pending-dot" title="Syncing"></span>' : ""}</div>
+          <div class="meta">${b.category} · due day ${b.day_of_month} · ${fmtHome(b.amount)}</div>
+        </div>
+        ${b.paidThisMonth
+          ? '<span class="bt-badge bt-badge--online">✓ Paid</span>'
+          : (readOnly ? "" : `<button class="bt-btn bt-btn--gold bt-btn--sm bill-pay-btn" data-bill="${b.id}" data-category="${b.category}" data-amount="${b.amount}">Mark paid</button>`)}
+      </div>
+    `).join("");
+    if (!readOnly) {
+      wrap.querySelectorAll(".bill-pay-btn").forEach((btn) => btn.addEventListener("click", () => {
+        btAddExpense(btUid, {
+          category: btn.dataset.category,
+          amount: parseFloat(btn.dataset.amount),
+          expense_date: new Date().toISOString().slice(0, 10),
+          bill_id: btn.dataset.bill,
+          goal_id: null, liability_id: null, notes: "Recurring bill"
+        });
+        renderAll();
+        toast("Marked paid");
+      }));
+    }
+  }
+
+  function renderCostOfLiving(store, summary) {
+    const { costOfLiving, disposable } = btDisposableIncome(store, summary);
+    const monthIncome = summary.periods.month.income;
+    document.getElementById("col-stats").innerHTML = `
+      <div class="bt-stat"><div class="bt-stat-label">Cost of Living</div><div class="bt-stat-value">${fmtMoney(costOfLiving)}</div></div>
+      <div class="bt-stat"><div class="bt-stat-label">Disposable</div><div class="bt-stat-value ${disposable >= 0 ? "pos" : "neg"}">${fmtMoney(disposable)}</div></div>
+    `;
+    const dep = store.profile?.dependents_count || 0;
+    let note = monthIncome > 0
+      ? `Essentials are ${Math.round((costOfLiving / monthIncome) * 100)}% of this month's income.`
+      : "Log some income and expenses to see this filled in.";
+    if (dep > 0) note += ` Supporting ${dep} ${dep === 1 ? "dependent" : "dependents"}.`;
+    document.getElementById("col-note").textContent = note;
+  }
+
+  function renderBudgetsInputs(store) {
+    const budgets = store.profile?.category_budgets || {};
+    const wrap = document.getElementById("budgets-list");
+    wrap.innerHTML = (BT_CONFIG.EXPENSE_CATEGORIES || []).map((cat) => `
+      <div class="bt-field-row" style="align-items:center;margin-bottom:8px">
+        <div style="flex:none;font-size:0.85rem;width:150px">${cat}</div>
+        <div><input type="number" min="0" step="0.01" class="budget-input" data-category="${cat}" value="${budgets[cat] || ""}" placeholder="no limit" /></div>
+      </div>
+    `).join("");
+  }
+
   function renderAll() {
     const store = btLoadStore(btUid);
     document.getElementById("bt-greeting").textContent = store.profile?.full_name ? `Welcome back, ${store.profile.full_name}` : "Your Financial Summary";
     document.getElementById("bt-sync-note").textContent = store.syncedAt ? "Last synced " + new Date(store.syncedAt).toLocaleString() : "Not yet synced — connect once to load your data.";
+    renderOnboard(store);
 
     renderCurrencySelector(store);
 
@@ -369,6 +516,8 @@
     renderSavings(summary);
     renderGoals(store);
     renderDebts(store);
+    renderBills(store);
+    renderCostOfLiving(store, summary);
     renderCashflowChart(store);
     renderCategoryBreakdown(store);
     renderCurrencyBreakdown(store);
@@ -377,7 +526,9 @@
       document.getElementById("s-name").value = store.profile?.full_name || "";
       document.getElementById("s-currency").value = store.profile?.currency || "TTD";
       document.getElementById("s-target").value = Math.round((store.profile?.annual_savings_target_pct ?? 0.2) * 100);
+      document.getElementById("s-dependents").value = store.profile?.dependents_count || 0;
       renderFxRatesInputs(store);
+      renderBudgetsInputs(store);
     }
   }
 
@@ -385,6 +536,7 @@
     document.getElementById("settings-card").style.display = "none";
     document.getElementById("toggle-goal-form").style.display = "none";
     document.getElementById("toggle-debt-form").style.display = "none";
+    document.getElementById("toggle-bill-form").style.display = "none";
   }
 
   async function init() {
@@ -419,6 +571,7 @@
 
     if (!readOnly) {
       document.getElementById("g-category").innerHTML = BT_CONFIG.GOAL_CATEGORIES.map((c) => `<option value="${c}">${c}</option>`).join("");
+      document.getElementById("b-category").innerHTML = BT_CONFIG.EXPENSE_CATEGORIES.map((c) => `<option value="${c}">${c}</option>`).join("");
 
       const showTipsBox = document.getElementById("s-show-tips");
       showTipsBox.checked = !btTipsHidden();
@@ -426,6 +579,21 @@
 
       document.getElementById("toggle-goal-form").addEventListener("click", () => document.getElementById("goal-form").classList.toggle("show"));
       document.getElementById("toggle-debt-form").addEventListener("click", () => document.getElementById("debt-form").classList.toggle("show"));
+      document.getElementById("toggle-bill-form").addEventListener("click", () => document.getElementById("bill-form").classList.toggle("show"));
+
+      document.getElementById("b-submit").addEventListener("click", () => {
+        const name = document.getElementById("b-name").value.trim();
+        const category = document.getElementById("b-category").value;
+        const amount = parseFloat(document.getElementById("b-amount").value);
+        const day_of_month = Math.max(1, Math.min(28, parseInt(document.getElementById("b-day").value, 10) || 1));
+        if (!name) return toast("Enter a bill name.");
+        if (!amount || amount <= 0) return toast("Enter a valid amount.");
+        btAddBill(btUid, { name, category, amount, day_of_month, active: true });
+        document.getElementById("b-name").value = ""; document.getElementById("b-amount").value = ""; document.getElementById("b-day").value = "1";
+        document.getElementById("bill-form").classList.remove("show");
+        renderAll();
+        toast("Bill saved");
+      });
 
       document.getElementById("g-submit").addEventListener("click", () => {
         const description = document.getElementById("g-desc").value.trim();
@@ -461,12 +629,18 @@
         const full_name = document.getElementById("s-name").value.trim() || null;
         const curr = document.getElementById("s-currency").value.trim() || "TTD";
         const pct = Math.max(0, Math.min(100, parseFloat(document.getElementById("s-target").value) || 0)) / 100;
+        const dependents_count = Math.max(0, parseInt(document.getElementById("s-dependents").value, 10) || 0);
         const fx_rates = {};
         document.querySelectorAll(".fx-rate-input").forEach((el) => {
           const v = parseFloat(el.value);
           if (v > 0) fx_rates[el.dataset.currency] = v;
         });
-        btUpdateProfile(btUid, { full_name, currency: curr, annual_savings_target_pct: pct, fx_rates });
+        const category_budgets = {};
+        document.querySelectorAll(".budget-input").forEach((el) => {
+          const v = parseFloat(el.value);
+          if (v > 0) category_budgets[el.dataset.category] = v;
+        });
+        btUpdateProfile(btUid, { full_name, currency: curr, annual_savings_target_pct: pct, dependents_count, fx_rates, category_budgets });
         renderAll();
         toast("Settings saved");
       });
