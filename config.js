@@ -68,6 +68,21 @@ const BT_CONFIG = {
     "Personal": ["netflix", "spotify", "gym", "haircut", "salon", "shopping", "clothes", "subscription"]
   },
 
+  /* How money physically moved — set on every income and expense entry so
+     it can be tracked by card/account, not just by category. Same list
+     used on both sides: an expense is "paid with", income is "received via". */
+  PAYMENT_TYPES: ["Cash", "Debit Card", "Credit Card", "Cheque", "Bank Transfer", "Mobile Payment", "Other"],
+
+  /* Same idea as CATEGORY_KEYWORDS, but for guessing the payment type off
+     a scanned receipt (e.g. a card network name printed near the total). */
+  PAYMENT_KEYWORDS: {
+    "Credit Card": ["credit card", "visa credit", "mastercard credit", "amex", "american express", "credit"],
+    "Debit Card": ["debit card", "debit"],
+    "Cash": ["cash tendered", "cash paid", "cash change", "cash"],
+    "Cheque": ["cheque", "check no", "check #", "chq"],
+    "Mobile Payment": ["wipay", "linqpay", "paypal", "mobile pay"]
+  },
+
   /* Health-check thresholds — pulled directly from the Blacktree Financial
      Services 12-Month Tracking Tool's own guideline sheets, just applied
      live instead of read off a spreadsheet. */

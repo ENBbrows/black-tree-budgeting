@@ -59,6 +59,18 @@
     <label for="f-notes" data-tip="Anything extra worth remembering. Examples: &quot;Year-end bonus&quot;, &quot;First half of contract payment&quot;. Totally optional.">Notes <span style="font-weight:400;color:var(--bt-muted)">(optional)</span></label>
     <input id="f-notes" type="text" placeholder="" />
 
+    <div class="bt-field-row">
+      <div>
+        <label for="f-payment-type" data-tip="How this money reached you — cash, deposited to a card/account, cheque, etc. Lets Black Tree track where your money actually comes in, not just its source.">Received via <span style="font-weight:400;color:var(--bt-muted)">(optional)</span></label>
+        <select id="f-payment-type"><option value="">— not specified —</option></select>
+      </div>
+      <div>
+        <label for="f-payment-account" data-tip="Optional — which account it landed in, e.g. &quot;Republic Chequing&quot;. Type a new one or pick one you've used before.">Account <span style="font-weight:400;color:var(--bt-muted)">(optional)</span></label>
+        <input id="f-payment-account" type="text" list="payment-account-suggestions" placeholder="e.g. Republic Chequing" />
+        <datalist id="payment-account-suggestions"></datalist>
+      </div>
+    </div>
+
     <button class="bt-btn bt-btn--gold" id="f-submit" style="margin-top:18px">Save income</button>
   </div>
 
@@ -108,15 +120,30 @@
     const wrap = document.getElementById("bt-recent");
     const rows = [...store.income].sort((a, b) => (b.entry_date + b.created_at).localeCompare(a.entry_date + a.created_at)).slice(0, 8);
     if (!rows.length) { wrap.innerHTML = '<div class="bt-empty">Nothing logged yet.</div>'; return; }
-    wrap.innerHTML = rows.map((r) => `
+    wrap.innerHTML = rows.map((r) => {
+      const via = r.payment_type ? r.payment_type + (r.payment_account ? " · " + r.payment_account : "") : "";
+      return `
       <div class="bt-list-row">
         <div>
           <div>${r.source}${r._pending ? '<span class="bt-pending-dot" title="Syncing"></span>' : ""}</div>
-          <div class="meta">${r.frequency} · ${r.entry_date}</div>
+          <div class="meta">${r.frequency} · ${r.entry_date}${via ? " · " + via : ""}</div>
         </div>
         <div class="amt">${fmtMoney(r.amount, r.currency || home)}</div>
       </div>
-    `).join("");
+    `;
+    }).join("");
+  }
+
+  function paymentAccountSuggestions(store) {
+    const names = new Set();
+    [...store.income, ...store.expenses].forEach((e) => { if (e.payment_account) names.add(e.payment_account); });
+    return [...names];
+  }
+
+  function refreshPaymentAccountSuggestions() {
+    const store = btLoadStore(btUid);
+    document.getElementById("payment-account-suggestions").innerHTML =
+      paymentAccountSuggestions(store).map((n) => `<option value="${n}">`).join("");
   }
 
   async function init() {
@@ -133,9 +160,15 @@
     const currencySel = document.getElementById("f-currency");
     currencySel.innerHTML = btCurrencyOptions(profile).map((c) => `<option value="${c}">${c}</option>`).join("");
 
+    const paymentSel = document.getElementById("f-payment-type");
+    paymentSel.innerHTML = '<option value="">— not specified —</option>' + BT_CONFIG.PAYMENT_TYPES.map((p) => `<option value="${p}">${p}</option>`).join("");
+    const lastPaymentType = localStorage.getItem("bt_last_income_payment_type");
+    if (lastPaymentType && BT_CONFIG.PAYMENT_TYPES.includes(lastPaymentType)) paymentSel.value = lastPaymentType;
+    refreshPaymentAccountSuggestions();
+
     updateNetBadge();
     renderRecent();
-    btSync(btUid).then(renderRecent);
+    btSync(btUid).then(() => { renderRecent(); refreshPaymentAccountSuggestions(); });
 
     document.getElementById("f-submit").addEventListener("click", () => {
       const source = document.getElementById("f-source").value.trim();
@@ -144,18 +177,24 @@
       const frequency = freqSel.value;
       const entry_date = document.getElementById("f-date").value;
       const notes = document.getElementById("f-notes").value.trim() || null;
+      const payment_type = paymentSel.value || null;
+      const payment_account = document.getElementById("f-payment-account").value.trim() || null;
 
       if (!source) return toast("Enter an income source.");
       if (!amount || amount <= 0) return toast("Enter a valid amount.");
       if (!entry_date) return toast("Pick a date.");
 
-      btAddIncome(btUid, { source, amount, currency, frequency, entry_date, notes });
+      btAddIncome(btUid, { source, amount, currency, frequency, entry_date, notes, payment_type, payment_account });
       renderRecent();
+      refreshPaymentAccountSuggestions();
       toast(navigator.onLine ? "Income saved" : "Saved offline — will sync automatically");
+
+      if (payment_type) localStorage.setItem("bt_last_income_payment_type", payment_type);
 
       document.getElementById("f-source").value = "";
       document.getElementById("f-amount").value = "";
       document.getElementById("f-notes").value = "";
+      document.getElementById("f-payment-account").value = "";
     });
 
     if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});

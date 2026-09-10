@@ -226,6 +226,17 @@ function btGuessCategory(text) {
   return null;
 }
 
+/** Same idea as btGuessCategory, but for how the bill says it was paid (card network, "cash tendered", etc). */
+function btGuessPaymentType(text) {
+  if (!text) return null;
+  const lower = text.toLowerCase();
+  const dict = (typeof BT_CONFIG !== "undefined" && BT_CONFIG.PAYMENT_KEYWORDS) || {};
+  for (const [type, keywords] of Object.entries(dict)) {
+    if (keywords.some((k) => lower.includes(k))) return type;
+  }
+  return null;
+}
+
 /**
  * Pulls the most likely total amount out of OCR'd receipt/bill text.
  * Prefers a number on a line mentioning "total"/"amount due"/"balance";
@@ -371,6 +382,19 @@ function btSumExpenseCategoryInRange(entries, category, start, end, viewCurrency
   return entries
     .filter((e) => e.category === category && btDateInRange(e.expense_date, start, end))
     .reduce((s, e) => s + btConvertAmount(Number(e.amount), home, viewCurrency, profile).value, 0);
+}
+
+/** Expenses in range, grouped by payment_type ("Cash", "Credit Card", ...) and converted into viewCurrency — shows where money actually left from, not just what it went toward. Entries with no payment type recorded land under "Not specified". */
+function btExpensesByPaymentMethod(entries, start, end, viewCurrency, profile) {
+  const home = profile?.currency || "TTD";
+  const totals = {};
+  entries.forEach((e) => {
+    if (!btDateInRange(e.expense_date, start, end)) return;
+    const { value } = btConvertAmount(Number(e.amount), home, viewCurrency, profile);
+    const key = e.payment_type || "Not specified";
+    totals[key] = (totals[key] || 0) + value;
+  });
+  return totals;
 }
 
 /** Income entries in range, grouped by source and converted into viewCurrency — feeds the cash flow statement. */

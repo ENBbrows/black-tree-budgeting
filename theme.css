@@ -201,4 +201,8 @@ label[data-tip]::after {
 .bt-bill-item:last-child { border-bottom: none; }
 .bt-bill-item .meta { font-size: 0.78rem; color: var(--bt-muted); }
 
+.bt-chip-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.bt-chip { border: 1px solid var(--bt-border); background: var(--bt-white); border-radius: 999px; padding: 7px 14px; font-size: 0.82rem; font-family: inherit; cursor: pointer; }
+.bt-chip--selected { background: var(--bt-gold); border-color: var(--bt-gold); color: #fff; }
+
 ::selection { background: var(--bt-gold-light); }

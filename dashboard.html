@@ -118,6 +118,11 @@
         <h2>Spending by Category — This Month</h2>
         <div id="chart-category-wrap"><div class="bt-empty">No expenses logged this month yet.</div></div>
       </div>
+
+      <div class="bt-card">
+        <h2 data-tip="Where your money actually left from this month — cash, a specific card, cheque, etc — not just what it was spent on. Set this on each expense to see it here.">Spending by Payment Method — This Month</h2>
+        <div id="chart-payment-wrap"><div class="bt-empty">No expenses logged this month yet.</div></div>
+      </div>
     </div>
 
     <div>
@@ -394,6 +399,20 @@
     }).join("");
   }
 
+  function renderPaymentBreakdown(store) {
+    const { month } = btPeriodBounds();
+    const totals = btExpensesByPaymentMethod(store.expenses, month.start, month.end, viewCurrency, store.profile);
+    const wrap = document.getElementById("chart-payment-wrap");
+    const total = Object.values(totals).reduce((a, b) => a + b, 0);
+    if (!total) { wrap.innerHTML = '<div class="bt-empty">No expenses logged this month yet.</div>'; return; }
+    const rows = Object.entries(totals).sort((a, b) => b[1] - a[1]);
+    wrap.innerHTML = rows.map(([method, amt]) => `
+      <div style="margin-bottom:10px">
+        <div style="display:flex;justify-content:space-between;font-size:0.85rem;margin-bottom:4px"><span>${method}</span><span>${fmtMoney(amt)} · ${Math.round(amt / total * 100)}%</span></div>
+        <div class="bt-progress"><div style="width:${(amt / total) * 100}%;background:${method === "Not specified" ? "var(--bt-border)" : "var(--bt-ink)"}"></div></div>
+      </div>`).join("");
+  }
+
   function renderCurrencyBreakdown(store) {
     const { month } = btPeriodBounds();
     const totals = btIncomeBreakdownByCurrency(store, month.start, month.end);
@@ -534,6 +553,7 @@
     renderCostOfLiving(store, summary);
     renderCashflowChart(store);
     renderCategoryBreakdown(store);
+    renderPaymentBreakdown(store);
     renderCurrencyBreakdown(store);
 
     if (!readOnly) {

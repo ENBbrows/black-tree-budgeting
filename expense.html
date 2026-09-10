@@ -22,12 +22,12 @@
   #category-hint { font-size: 0.76rem; color: var(--bt-gold); margin: -12px 0 12px; display: none; }
   #category-hint.show { display: block; }
   #scan-privacy-note { font-size: 0.76rem; color: var(--bt-muted); margin: -10px 0 16px; }
-  #category-bubble { display: none; background: rgba(194,145,51,0.08); border: 1px solid var(--bt-gold); border-radius: var(--bt-radius); padding: 14px; margin-bottom: 16px; }
-  #category-bubble.show { display: block; }
-  #category-bubble p { margin: 0 0 10px; font-size: 0.86rem; }
-  .bt-chip-row { display: flex; flex-wrap: wrap; gap: 8px; }
-  .bt-chip { border: 1px solid var(--bt-border); background: var(--bt-white); border-radius: 999px; padding: 7px 14px; font-size: 0.82rem; font-family: inherit; cursor: pointer; }
-  .bt-chip--selected { background: var(--bt-gold); border-color: var(--bt-gold); color: #fff; }
+  #scan-bubble { display: none; background: rgba(194,145,51,0.08); border: 1px solid var(--bt-gold); border-radius: var(--bt-radius); padding: 14px; margin-bottom: 16px; }
+  #scan-bubble.show { display: block; }
+  #scan-bubble p { margin: 0 0 10px; font-size: 0.86rem; }
+  #scan-bubble .bt-chip-row { margin-bottom: 14px; }
+  #scan-bubble .bt-btn--sm { width: auto; margin-top: 2px; }
+  .scan-bubble-note { font-size: 0.78rem; color: var(--bt-muted); margin: 0 0 10px; }
 </style>
 </head>
 <body>
@@ -47,9 +47,13 @@
   <p id="scan-privacy-note">Photos are read on your device only — never uploaded or saved. The image is discarded the moment we've pulled out the details.</p>
   <p id="scan-status"></p>
 
-  <div id="category-bubble">
-    <p>Scanned <strong id="bubble-summary"></strong> — what category is this?</p>
-    <div class="bt-chip-row" id="bubble-chips"></div>
+  <div id="scan-bubble">
+    <p>Scanned <strong id="bubble-summary"></strong></p>
+    <p class="scan-bubble-note">What category is this?</p>
+    <div class="bt-chip-row" id="bubble-category-chips"></div>
+    <p class="scan-bubble-note">How was it paid?</p>
+    <div class="bt-chip-row" id="bubble-payment-chips"></div>
+    <button type="button" class="bt-btn bt-btn--ghost bt-btn--sm" id="bubble-done">Done</button>
   </div>
 
   <div class="bt-card">
@@ -74,6 +78,18 @@
     <div id="link-wrap" style="display:none">
       <label for="f-link" data-tip="Optional — pick a goal or debt to automatically add this amount to its progress.">Apply toward <span style="font-weight:400;color:var(--bt-muted)">(optional)</span></label>
       <select id="f-link"><option value="">— none —</option></select>
+    </div>
+
+    <div class="bt-field-row">
+      <div>
+        <label for="f-payment-type" data-tip="How you paid — cash, a specific card, cheque, etc. Lets Black Tree track where your money actually leaves from, not just what it went toward.">Paid with <span style="font-weight:400;color:var(--bt-muted)">(optional)</span></label>
+        <select id="f-payment-type"><option value="">— not specified —</option></select>
+      </div>
+      <div>
+        <label for="f-payment-account" data-tip="Optional — which card or account, e.g. &quot;Republic Visa&quot; or &quot;Scotia Chequing&quot;. Type a new one or pick one you've used before.">Card / account <span style="font-weight:400;color:var(--bt-muted)">(optional)</span></label>
+        <input id="f-payment-account" type="text" list="payment-account-suggestions" placeholder="e.g. Republic Visa" />
+        <datalist id="payment-account-suggestions"></datalist>
+      </div>
     </div>
 
     <button class="bt-btn bt-btn--gold" id="f-submit" style="margin-top:18px">Save expense</button>
@@ -127,15 +143,18 @@
     const wrap = document.getElementById("bt-recent");
     const rows = [...store.expenses].sort((a, b) => (b.expense_date + b.created_at).localeCompare(a.expense_date + a.created_at)).slice(0, 8);
     if (!rows.length) { wrap.innerHTML = '<div class="bt-empty">Nothing logged yet.</div>'; return; }
-    wrap.innerHTML = rows.map((r) => `
+    wrap.innerHTML = rows.map((r) => {
+      const paidWith = r.payment_type ? r.payment_type + (r.payment_account ? " · " + r.payment_account : "") : "";
+      return `
       <div class="bt-list-row">
         <div>
           <div>${r.notes || r.category}${r._pending ? '<span class="bt-pending-dot" title="Syncing"></span>' : ""}</div>
-          <div class="meta">${r.category} · ${r.expense_date}</div>
+          <div class="meta">${r.category} · ${r.expense_date}${paidWith ? " · " + paidWith : ""}</div>
         </div>
         <div class="amt">${fmtMoney(r.amount)}</div>
       </div>
-    `).join("");
+    `;
+    }).join("");
   }
 
   function updateLinkOptions() {
@@ -184,37 +203,47 @@
     return scanLib;
   }
 
-  function hideCategoryBubble() {
-    document.getElementById("category-bubble").classList.remove("show");
+  function hideScanBubble() {
+    document.getElementById("scan-bubble").classList.remove("show");
   }
 
-  function showCategoryBubble(guessedCategory, meta) {
-    const bubble = document.getElementById("category-bubble");
+  function buildChipRow(wrapId, options, selected, onPick) {
+    const wrap = document.getElementById(wrapId);
+    wrap.innerHTML = options.map((o) => `<button type="button" class="bt-chip${o === selected ? " bt-chip--selected" : ""}" data-value="${o}">${o}</button>`).join("");
+    wrap.querySelectorAll(".bt-chip").forEach((chip) => {
+      chip.addEventListener("click", () => {
+        wrap.querySelectorAll(".bt-chip").forEach((c) => c.classList.remove("bt-chip--selected"));
+        chip.classList.add("bt-chip--selected");
+        onPick(chip.dataset.value);
+      });
+    });
+  }
+
+  function showScanBubble(guessedCategory, guessedPaymentType, meta) {
+    const bubble = document.getElementById("scan-bubble");
     const parts = [];
     if (meta.amount) parts.push(fmtMoney(meta.amount));
     if (meta.merchant) parts.push("at " + meta.merchant);
     if (meta.date) parts.push("on " + meta.date);
+    if (guessedPaymentType) parts.push("· paid with " + guessedPaymentType);
     document.getElementById("bubble-summary").textContent = parts.length ? parts.join(" ") : "this bill";
 
-    const chips = document.getElementById("bubble-chips");
-    chips.innerHTML = BT_CONFIG.EXPENSE_CATEGORIES.map((c) => `<button type="button" class="bt-chip${c === guessedCategory ? " bt-chip--selected" : ""}" data-category="${c}">${c}</button>`).join("");
-    chips.querySelectorAll(".bt-chip").forEach((chip) => {
-      chip.addEventListener("click", () => {
-        const category = chip.dataset.category;
-        document.getElementById("f-category").value = category;
-        categoryManuallySet = true;
-        document.getElementById("category-hint").classList.remove("show");
-        updateLinkOptions();
-        toast("Category set to " + category);
-        hideCategoryBubble();
-      });
+    buildChipRow("bubble-category-chips", BT_CONFIG.EXPENSE_CATEGORIES, guessedCategory, (category) => {
+      document.getElementById("f-category").value = category;
+      categoryManuallySet = true;
+      document.getElementById("category-hint").classList.remove("show");
+      updateLinkOptions();
     });
+    buildChipRow("bubble-payment-chips", BT_CONFIG.PAYMENT_TYPES, guessedPaymentType, (paymentType) => {
+      document.getElementById("f-payment-type").value = paymentType;
+    });
+
     bubble.classList.add("show");
   }
 
   async function handleScanFile(file) {
     const statusEl = document.getElementById("scan-status");
-    hideCategoryBubble();
+    hideScanBubble();
     statusEl.classList.add("show");
     statusEl.textContent = "Loading scanner…";
     try {
@@ -228,6 +257,7 @@
       const date = btGuessDateFromText(text);
       const merchant = btGuessMerchantFromText(text);
       const category = btGuessCategory(text);
+      const paymentType = btGuessPaymentType(text);
 
       if (amount) document.getElementById("f-amount").value = amount.toFixed(2);
       if (date) document.getElementById("f-date").value = date;
@@ -236,16 +266,29 @@
         document.getElementById("f-category").value = category;
         categoryManuallySet = true; // trust the scan over further auto-guessing from the description field
       }
+      if (paymentType) document.getElementById("f-payment-type").value = paymentType;
       updateLinkOptions();
 
       statusEl.textContent = amount
         ? "Image discarded — nothing was uploaded or saved. Double-check the details below before saving."
         : "Couldn't find a clear total — image discarded, fill in the amount yourself.";
-      showCategoryBubble(category, { amount, merchant, date });
+      showScanBubble(category, paymentType, { amount, merchant, date });
     } catch (err) {
       console.error("Black Tree bill scan failed", err);
       statusEl.textContent = "Couldn't read that image — enter the details manually below.";
     }
+  }
+
+  function paymentAccountSuggestions(store) {
+    const names = new Set();
+    [...store.income, ...store.expenses].forEach((e) => { if (e.payment_account) names.add(e.payment_account); });
+    return [...names];
+  }
+
+  function refreshPaymentAccountSuggestions() {
+    const store = btLoadStore(btUid);
+    document.getElementById("payment-account-suggestions").innerHTML =
+      paymentAccountSuggestions(store).map((n) => `<option value="${n}">`).join("");
   }
 
   async function init() {
@@ -260,17 +303,24 @@
 
     document.getElementById("f-desc").addEventListener("input", tryAutoGuessCategory);
 
+    const paymentSel = document.getElementById("f-payment-type");
+    paymentSel.innerHTML = '<option value="">— not specified —</option>' + BT_CONFIG.PAYMENT_TYPES.map((p) => `<option value="${p}">${p}</option>`).join("");
+    const lastPaymentType = localStorage.getItem("bt_last_payment_type");
+    if (lastPaymentType && BT_CONFIG.PAYMENT_TYPES.includes(lastPaymentType)) paymentSel.value = lastPaymentType;
+    refreshPaymentAccountSuggestions();
+
     document.getElementById("scan-btn").addEventListener("click", () => document.getElementById("scan-file").click());
     document.getElementById("scan-file").addEventListener("change", (e) => {
       const file = e.target.files[0];
       if (file) handleScanFile(file);
       e.target.value = "";
     });
+    document.getElementById("bubble-done").addEventListener("click", hideScanBubble);
 
     updateNetBadge();
     renderRecent();
     updateLinkOptions();
-    btSync(btUid).then(() => { renderRecent(); updateLinkOptions(); });
+    btSync(btUid).then(() => { renderRecent(); updateLinkOptions(); refreshPaymentAccountSuggestions(); });
 
     document.getElementById("f-submit").addEventListener("click", () => {
       const notes = document.getElementById("f-desc").value.trim() || null;
@@ -279,24 +329,30 @@
       const expense_date = document.getElementById("f-date").value;
       const linkSel = document.getElementById("f-link");
       const linkId = linkSel.value || null;
+      const payment_type = paymentSel.value || null;
+      const payment_account = document.getElementById("f-payment-account").value.trim() || null;
 
       if (!notes) return toast("Say what this was for.");
       if (!amount || amount <= 0) return toast("Enter a valid amount.");
       if (!expense_date) return toast("Pick a date.");
 
-      const payload = { category, amount, expense_date, notes, goal_id: null, liability_id: null };
+      const payload = { category, amount, expense_date, notes, goal_id: null, liability_id: null, payment_type, payment_account };
       if (linkId && linkSel.dataset.kind === "goal") payload.goal_id = linkId;
       if (linkId && linkSel.dataset.kind === "liability") payload.liability_id = linkId;
 
       btAddExpense(btUid, payload);
       renderRecent();
+      refreshPaymentAccountSuggestions();
       toast(navigator.onLine ? "Expense saved" : "Saved offline — will sync automatically");
+
+      if (payment_type) localStorage.setItem("bt_last_payment_type", payment_type);
 
       document.getElementById("f-desc").value = "";
       document.getElementById("f-amount").value = "";
+      document.getElementById("f-payment-account").value = "";
       document.getElementById("scan-status").classList.remove("show");
       document.getElementById("category-hint").classList.remove("show");
-      hideCategoryBubble();
+      hideScanBubble();
       categoryManuallySet = false;
     });
 
