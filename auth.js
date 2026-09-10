@@ -20,6 +20,19 @@ async function btSendMagicLink(email) {
   if (error) throw error;
 }
 
+/** Admin-only alternative to the magic link: sign in with an email + password already set via btSetPassword(). */
+async function btSignInWithPassword(email, password) {
+  const { data, error } = await btSupabase.auth.signInWithPassword({ email, password });
+  if (error) throw error;
+  return data.user;
+}
+
+/** Sets/changes a password on the *currently signed-in* account, so it can use btSignInWithPassword afterward. Requires an existing session (e.g. from a normal magic-link sign-in) — this doesn't create an account. */
+async function btSetPassword(password) {
+  const { error } = await btSupabase.auth.updateUser({ password });
+  if (error) throw error;
+}
+
 async function btSignOut() {
   try { await btSupabase.auth.signOut(); } catch (e) { /* offline sign-out still clears local session below */ }
   const session = await btSupabase.auth.getSession();

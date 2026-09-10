@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Admin — Black Tree</title>
+<link rel="apple-touch-icon" href="assets/icon-180.png">
+<link rel="icon" href="assets/icon-32.png">
+<meta name="theme-color" content="#221E1F">
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="theme.css" />
+<style>
+  .bt-roster-row { display:flex; align-items:center; justify-content:space-between; padding:11px 0; border-bottom:1px solid var(--bt-border); gap:10px; flex-wrap:wrap; }
+  .bt-roster-row:last-child { border-bottom:none; }
+  .bt-roster-row .meta { font-size:0.78rem; color:var(--bt-muted); }
+  .bt-role-tag { font-size:0.7rem; text-transform:uppercase; letter-spacing:0.04em; padding:3px 8px; border-radius:999px; background:var(--bt-cream); color:var(--bt-muted); }
+  #admin-status-msg { font-size:0.85rem; margin-top:8px; min-height:1.2em; }
+</style>
+</head>
+<body>
+<div class="bt-header bt-header--row" style="max-width:720px;margin:0 auto">
+  <img src="assets/wordmark-gold.png" alt="Black Tree Investments" style="height:26px">
+  <button class="bt-btn bt-btn--ghost bt-btn--sm" id="admin-logout" style="display:none">Log out</button>
+</div>
+
+<div class="bt-container" style="max-width:720px">
+  <h1>Admin</h1>
+  <p class="bt-sub">Manages who is allowed to be an advisor, and oversees the client↔advisor roster. Never shows any client's actual numbers.</p>
+
+  <div id="admin-login-section" class="bt-card" style="display:none">
+    <h2>Sign in</h2>
+    <label for="al-email">Email</label>
+    <input id="al-email" type="email" autocomplete="email" placeholder="you@blacktreeinvestments.com" />
+    <label for="al-password">Password</label>
+    <input id="al-password" type="password" autocomplete="current-password" />
+    <button class="bt-btn bt-btn--gold" id="al-submit" style="margin-top:14px">Sign in</button>
+    <div id="admin-status-msg"></div>
+    <p class="bt-sub" style="margin-top:16px;margin-bottom:0">First time here? <a href="login.html?redirect=admin.html">Sign in with a magic link instead</a> — you can set a password below once you're in.</p>
+  </div>
+
+  <div id="admin-password-section" class="bt-card" style="display:none">
+    <h2>🔑 Password for this device</h2>
+    <p class="bt-sub" style="margin-bottom:10px">Set or update a password on this account so you can come back to admin.html directly, without a magic link each time. This alone doesn't grant admin access — that's assigned separately.</p>
+    <input id="ap-password" type="password" autocomplete="new-password" placeholder="New password" />
+    <button class="bt-btn bt-btn--ghost" id="ap-submit" style="margin-top:12px">Set password</button>
+    <div id="admin-password-msg" style="font-size:0.85rem;margin-top:8px"></div>
+  </div>
+
+  <div id="admin-not-admin-section" class="bt-card" style="display:none">
+    <h2>Not an admin account</h2>
+    <p class="bt-sub" style="margin-bottom:0">You're signed in, but this account doesn't have admin access. Admin access is assigned by Black Tree directly in the database — it isn't self-service.</p>
+  </div>
+
+  <div id="admin-panel-section" style="display:none">
+    <div class="bt-card">
+      <h2>Set a role</h2>
+      <p class="bt-sub" style="margin-bottom:10px">Only accounts you promote to "agent" here can ever gain access to a client's numbers — and only after that client shares their own link code.</p>
+      <div class="bt-field-row">
+        <div><input id="role-email" type="email" placeholder="person@email.com" /></div>
+        <div>
+          <select id="role-select">
+            <option value="client">Client</option>
+            <option value="agent">Agent</option>
+            <option value="admin">Admin</option>
+          </select>
+        </div>
+      </div>
+      <button class="bt-btn bt-btn--gold" id="role-submit" style="margin-top:12px">Set role</button>
+      <div id="role-status" style="font-size:0.85rem;margin-top:8px"></div>
+    </div>
+
+    <div class="bt-card">
+      <h2>Force link / unlink</h2>
+      <p class="bt-sub" style="margin-bottom:10px">Support override — normal linking happens client-side via a one-time code. Leave "Agent email" blank to unlink.</p>
+      <div class="bt-field-row">
+        <div><input id="link-client-email" type="email" placeholder="client@email.com" /></div>
+        <div><input id="link-agent-email" type="email" placeholder="agent@email.com (blank to unlink)" /></div>
+      </div>
+      <button class="bt-btn bt-btn--ghost" id="link-submit" style="margin-top:12px">Apply</button>
+      <div id="link-status" style="font-size:0.85rem;margin-top:8px"></div>
+    </div>
+
+    <div class="bt-card">
+      <div class="bt-section-head" style="display:flex;justify-content:space-between;align-items:center;margin:0 0 6px">
+        <h2 style="margin:0">Roster</h2>
+        <button class="bt-btn bt-btn--ghost bt-btn--sm" id="roster-refresh">Refresh</button>
+      </div>
+      <p class="bt-sub" style="margin-bottom:10px">Email, role, and who's linked to whom — never any financial data.</p>
+      <div id="roster-list"><div class="bt-empty">Loading…</div></div>
+    </div>
+  </div>
+
+  <p class="bt-sub" style="text-align:center"><a href="dashboard.html">← Dashboard</a></p>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="config.js"></script>
+<script src="auth.js"></script>
+<script src="store.js"></script>
+<script>
+  function showMsg(el, text, ok) {
+    el.textContent = text;
+    el.style.color = ok ? "var(--bt-green)" : "var(--bt-red)";
+  }
+
+  async function loadRoster() {
+    const wrap = document.getElementById("roster-list");
+    wrap.innerHTML = '<div class="bt-empty">Loading…</div>';
+    const { data, error } = await btSupabase.from("bt_profiles").select("id,email,full_name,role,agent_id").order("email");
+    if (error) { wrap.innerHTML = '<div class="bt-empty">Couldn\'t load the roster.</div>'; return; }
+    if (!data.length) { wrap.innerHTML = '<div class="bt-empty">No accounts yet.</div>'; return; }
+    const byId = Object.fromEntries(data.map((p) => [p.id, p]));
+    wrap.innerHTML = data.map((p) => {
+      const linked = p.role === "client" && p.agent_id ? byId[p.agent_id] : null;
+      const linkNote = p.role === "client" ? (linked ? `Linked to ${linked.email}` : "No advisor linked") : "";
+      return `
+      <div class="bt-roster-row">
+        <div>
+          <div>${p.full_name || p.email} <span class="bt-role-tag">${p.role}</span></div>
+          <div class="meta">${p.email}${linkNote ? " · " + linkNote : ""}</div>
+        </div>
+      </div>`;
+    }).join("");
+  }
+
+  async function showAdminPanel() {
+    document.getElementById("admin-panel-section").style.display = "";
+    loadRoster();
+  }
+
+  async function init() {
+    const session = await btGetSession();
+
+    if (!session) {
+      document.getElementById("admin-login-section").style.display = "";
+      document.getElementById("al-submit").addEventListener("click", async () => {
+        const email = document.getElementById("al-email").value.trim();
+        const password = document.getElementById("al-password").value;
+        const statusEl = document.getElementById("admin-status-msg");
+        if (!email || !password) return showMsg(statusEl, "Enter your email and password.", false);
+        if (!navigator.onLine) return showMsg(statusEl, "You need a connection to sign in.", false);
+        showMsg(statusEl, "Signing in…", true);
+        try {
+          await btSignInWithPassword(email, password);
+          window.location.reload();
+        } catch (err) {
+          showMsg(statusEl, err.message || "Couldn't sign in.", false);
+        }
+      });
+      return;
+    }
+
+    window.btCurrentUserId = session.user.id;
+    document.getElementById("admin-logout").style.display = "";
+    document.getElementById("admin-logout").addEventListener("click", async () => { await btSignOut(); window.location.replace("login.html"); });
+
+    document.getElementById("admin-password-section").style.display = "";
+    document.getElementById("ap-submit").addEventListener("click", async () => {
+      const password = document.getElementById("ap-password").value;
+      const msgEl = document.getElementById("admin-password-msg");
+      if (!password || password.length < 8) return showMsg(msgEl, "Use at least 8 characters.", false);
+      if (!navigator.onLine) return showMsg(msgEl, "You need a connection to set a password.", false);
+      try {
+        await btSetPassword(password);
+        document.getElementById("ap-password").value = "";
+        showMsg(msgEl, "Password set — you can sign in with it here next time.", true);
+      } catch (err) {
+        showMsg(msgEl, err.message || "Couldn't set a password.", false);
+      }
+    });
+
+    if (!navigator.onLine) {
+      document.getElementById("admin-not-admin-section").style.display = "";
+      document.getElementById("admin-not-admin-section").querySelector("p").textContent = "Connect once to check admin access.";
+      return;
+    }
+
+    const profile = await btGetOrLoadProfile(session.user.id);
+    if (!profile || profile.role !== "admin") {
+      document.getElementById("admin-not-admin-section").style.display = "";
+      return;
+    }
+
+    await showAdminPanel();
+    document.getElementById("roster-refresh").addEventListener("click", loadRoster);
+
+    document.getElementById("role-submit").addEventListener("click", async () => {
+      const target_email = document.getElementById("role-email").value.trim();
+      const new_role = document.getElementById("role-select").value;
+      const statusEl = document.getElementById("role-status");
+      if (!target_email) return showMsg(statusEl, "Enter an email.", false);
+      showMsg(statusEl, "Applying…", true);
+      const { data, error } = await btSupabase.rpc("bt_admin_set_role", { target_email, new_role });
+      if (error || !data?.ok) {
+        showMsg(statusEl, data?.error === "no_account" ? "No account found for that email." : "Couldn't set that role.", false);
+        return;
+      }
+      showMsg(statusEl, `${target_email} is now ${new_role}.`, true);
+      document.getElementById("role-email").value = "";
+      loadRoster();
+    });
+
+    document.getElementById("link-submit").addEventListener("click", async () => {
+      const client_email = document.getElementById("link-client-email").value.trim();
+      const agent_email = document.getElementById("link-agent-email").value.trim();
+      const statusEl = document.getElementById("link-status");
+      if (!client_email) return showMsg(statusEl, "Enter the client's email.", false);
+      showMsg(statusEl, "Applying…", true);
+      const { data, error } = await btSupabase.rpc("bt_admin_set_link", { client_email, agent_email: agent_email || null });
+      if (error || !data?.ok) {
+        const reason = data?.error === "no_client" ? "No client found for that email."
+          : data?.error === "no_agent" ? "No agent found for that email."
+          : "Couldn't update that link.";
+        showMsg(statusEl, reason, false);
+        return;
+      }
+      showMsg(statusEl, data.unlinked ? `${client_email} unlinked.` : `${client_email} linked to ${agent_email}.`, true);
+      document.getElementById("link-client-email").value = "";
+      document.getElementById("link-agent-email").value = "";
+      loadRoster();
+    });
+  }
+  init();
+</script>
+</body>
+</html>

@@ -32,9 +32,10 @@
 
   <div class="bt-card">
     <h2>Add a client</h2>
-    <p class="bt-sub" style="margin-bottom:10px">The client must have already signed in at least once with their email.</p>
+    <p class="bt-sub" style="margin-bottom:10px">Ask your client to open their Dashboard → "My Advisor" and generate a one-time code, then enter their email and that code here. Linking only happens with the client's own action.</p>
     <div class="bt-field-row">
       <div><input id="claim-email" type="email" placeholder="client@email.com" /></div>
+      <div><input id="claim-code" type="text" inputmode="numeric" maxlength="6" placeholder="6-digit code" /></div>
     </div>
     <button class="bt-btn bt-btn--gold" id="claim-submit" style="margin-top:12px">Add client</button>
     <div id="claim-status" style="font-size:0.85rem;margin-top:8px"></div>
@@ -93,20 +94,24 @@
 
     document.getElementById("claim-submit").addEventListener("click", async () => {
       const email = document.getElementById("claim-email").value.trim();
+      const code = document.getElementById("claim-code").value.trim();
       const statusEl = document.getElementById("claim-status");
       if (!email) { statusEl.textContent = "Enter a client email."; statusEl.style.color = "var(--bt-red)"; return; }
+      if (!code) { statusEl.textContent = "Enter the code your client shared with you."; statusEl.style.color = "var(--bt-red)"; return; }
       if (!navigator.onLine) { statusEl.textContent = "You need a connection to add a client."; statusEl.style.color = "var(--bt-red)"; return; }
       statusEl.textContent = "Adding…"; statusEl.style.color = "var(--bt-muted)";
-      const { data, error } = await btSupabase.rpc("bt_claim_client", { client_email: email });
+      const { data, error } = await btSupabase.rpc("bt_redeem_link_code", { p_client_email: email, p_code: code });
       if (error || !data?.ok) {
         const reason = data?.error === "no_account" ? "No account found for that email — ask the client to sign in once first."
-          : data?.error === "not_a_client" ? "That email belongs to an agent, not a client."
+          : data?.error === "not_a_client" ? "That email belongs to an agent or admin, not a client."
+          : data?.error === "bad_code" ? "That code is wrong, expired, or already used — ask your client for a fresh one."
           : "Couldn't add that client.";
         statusEl.textContent = reason; statusEl.style.color = "var(--bt-red)";
         return;
       }
       statusEl.textContent = "Client added."; statusEl.style.color = "var(--bt-green)";
       document.getElementById("claim-email").value = "";
+      document.getElementById("claim-code").value = "";
       loadClients();
     });
 
