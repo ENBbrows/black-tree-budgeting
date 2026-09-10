@@ -310,7 +310,7 @@
     if (!list.length) { wrap.innerHTML = '<div class="bt-empty">No goals yet.</div>'; return; }
     wrap.innerHTML = list.map((g) => `
       <div class="bt-goal-item">
-        <div class="row1"><strong>${g.description}</strong><span>${fmtHome(g.saved_amount)} / ${fmtHome(g.target_amount)}</span></div>
+        <div class="row1"><strong>${btEscapeHtml(g.description)}</strong><span>${fmtHome(g.saved_amount)} / ${fmtHome(g.target_amount)}</span></div>
         <div class="bt-progress"><div style="width:${g.progress_pct * 100}%"></div></div>
         <div class="meta">${g.category}${g.target_date ? " · by " + g.target_date : ""} · ${fmtPct(g.progress_pct)} complete</div>
       </div>
@@ -334,9 +334,9 @@
       }
       return `
       <div class="bt-debt-item">
-        <div class="row1"><span style="display:flex;align-items:center;gap:6px">${dot}<strong>${l.debt_name}</strong></span><span>${fmtHome(l.estimated_remaining)} left</span></div>
+        <div class="row1"><span style="display:flex;align-items:center;gap:6px">${dot}<strong>${btEscapeHtml(l.debt_name)}</strong></span><span>${fmtHome(l.estimated_remaining)} left</span></div>
         <div class="bt-progress"><div style="width:${pctPaid * 100}%"></div></div>
-        <div class="meta">${l.lender || "—"}${l.interest_rate ? " · " + l.interest_rate + "%" : ""} · ${fmtHome(l.paid_via_tracker)} paid via tracker${paceNote ? " · " + paceNote : ""}${l.needs_payment_reminder ? ` · no payment in ${l.days_since_payment}d` : ""}</div>
+        <div class="meta">${btEscapeHtml(l.lender) || "—"}${l.interest_rate ? " · " + l.interest_rate + "%" : ""} · ${fmtHome(l.paid_via_tracker)} paid via tracker${paceNote ? " · " + paceNote : ""}${l.needs_payment_reminder ? ` · no payment in ${l.days_since_payment}d` : ""}</div>
       </div>`;
     }).join("");
   }
@@ -498,7 +498,7 @@
     wrap.innerHTML = bills.map((b) => `
       <div class="bt-bill-item">
         <div>
-          <div>${b.name}${b._pending ? '<span class="bt-pending-dot" title="Syncing"></span>' : ""}</div>
+          <div>${btEscapeHtml(b.name)}${b._pending ? '<span class="bt-pending-dot" title="Syncing"></span>' : ""}</div>
           <div class="meta">${b.category} · due day ${b.day_of_month} · ${fmtHome(b.amount)}</div>
         </div>
         ${b.paidThisMonth

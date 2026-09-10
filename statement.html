@@ -100,7 +100,7 @@
     const net = incomeTotal - expenseTotal;
 
     const incomeRows = Object.entries(incomeBySource).filter(([, v]) => v > 0).map(([source, v]) => `
-      <div class="bt-list-row"><div>${source}</div><div class="amt">${fmtMoney(v, currency)}</div></div>
+      <div class="bt-list-row"><div>${btEscapeHtml(source)}</div><div class="amt">${fmtMoney(v, currency)}</div></div>
     `).join("") || '<div class="bt-empty">No income logged this period.</div>';
 
     const expenseRows = expenseCats.map((c) => `

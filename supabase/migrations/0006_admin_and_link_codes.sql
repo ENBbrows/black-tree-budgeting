@@ -51,6 +51,7 @@ create table public.bt_link_codes (
   expires_at timestamptz not null,
   used_at timestamptz,
   used_by_agent_id uuid references auth.users(id) on delete set null,
+  attempts int not null default 0,
   created_at timestamptz not null default now()
 );
 create index bt_link_codes_client_idx on public.bt_link_codes (client_id);
@@ -90,7 +91,12 @@ $$;
 
 grant execute on function public.bt_generate_link_code() to authenticated;
 
--- Agent redeems a client's code to establish the link.
+-- Agent redeems a client's code to establish the link. A code is a bare
+-- 6-digit number, so it's guessable by brute force if nothing stops
+-- repeated tries — this locks the *current* pending code out after 5
+-- wrong guesses (forcing the client to generate a fresh one) rather than
+-- leaving an agent free to try all 1,000,000 combinations within the
+-- 30-minute window.
 create or replace function public.bt_redeem_link_code(p_client_email text, p_code text)
 returns jsonb
 language plpgsql
@@ -101,7 +107,7 @@ declare
   v_caller_role text;
   v_client_id uuid;
   v_client_role text;
-  v_code_id uuid;
+  v_code_row record;
 begin
   select role into v_caller_role from public.bt_profiles where id = auth.uid();
   if v_caller_role is distinct from 'agent' then
@@ -116,14 +122,25 @@ begin
     return jsonb_build_object('ok', false, 'error', 'not_a_client');
   end if;
 
-  select id into v_code_id from public.bt_link_codes
-    where client_id = v_client_id and code = p_code and used_at is null and expires_at > now()
+  select * into v_code_row from public.bt_link_codes
+    where client_id = v_client_id and used_at is null and expires_at > now()
     order by created_at desc limit 1;
-  if v_code_id is null then
+
+  if v_code_row.id is null then
     return jsonb_build_object('ok', false, 'error', 'bad_code');
   end if;
 
-  update public.bt_link_codes set used_at = now(), used_by_agent_id = auth.uid() where id = v_code_id;
+  if v_code_row.attempts >= 5 then
+    update public.bt_link_codes set expires_at = now() where id = v_code_row.id;
+    return jsonb_build_object('ok', false, 'error', 'bad_code');
+  end if;
+
+  if v_code_row.code is distinct from p_code then
+    update public.bt_link_codes set attempts = attempts + 1 where id = v_code_row.id;
+    return jsonb_build_object('ok', false, 'error', 'bad_code');
+  end if;
+
+  update public.bt_link_codes set used_at = now(), used_by_agent_id = auth.uid() where id = v_code_row.id;
   update public.bt_profiles set agent_id = auth.uid() where id = v_client_id;
 
   return jsonb_build_object('ok', true, 'id', v_client_id);

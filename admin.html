@@ -114,12 +114,12 @@
     const byId = Object.fromEntries(data.map((p) => [p.id, p]));
     wrap.innerHTML = data.map((p) => {
       const linked = p.role === "client" && p.agent_id ? byId[p.agent_id] : null;
-      const linkNote = p.role === "client" ? (linked ? `Linked to ${linked.email}` : "No advisor linked") : "";
+      const linkNote = p.role === "client" ? (linked ? `Linked to ${btEscapeHtml(linked.email)}` : "No advisor linked") : "";
       return `
       <div class="bt-roster-row">
         <div>
-          <div>${p.full_name || p.email} <span class="bt-role-tag">${p.role}</span></div>
-          <div class="meta">${p.email}${linkNote ? " · " + linkNote : ""}</div>
+          <div>${btEscapeHtml(p.full_name || p.email)} <span class="bt-role-tag">${btEscapeHtml(p.role)}</span></div>
+          <div class="meta">${btEscapeHtml(p.email)}${linkNote ? " · " + linkNote : ""}</div>
         </div>
       </div>`;
     }).join("");

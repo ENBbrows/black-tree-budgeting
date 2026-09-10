@@ -203,6 +203,11 @@ function btDateInRange(dateStr, start, end) {
   return dateStr >= start && dateStr <= end;
 }
 
+/** Escapes text before it's interpolated into an innerHTML template — every field a client controls (full_name, notes, descriptions, ...) needs this wherever it's rendered outside the page that field itself belongs to. */
+function btEscapeHtml(s) {
+  return String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
 function btSumInRange(entries, dateField, start, end) {
   return entries.filter((e) => btDateInRange(e[dateField], start, end)).reduce((s, e) => s + Number(e.amount), 0);
 }

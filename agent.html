@@ -69,10 +69,10 @@
     wrap.innerHTML = clients.map((c) => `
       <div class="bt-client-row">
         <div>
-          <div>${c.full_name || c.email}</div>
-          <div class="meta">${c.email}</div>
+          <div>${btEscapeHtml(c.full_name || c.email)}</div>
+          <div class="meta">${btEscapeHtml(c.email)}</div>
         </div>
-        <a class="bt-btn bt-btn--ghost bt-btn--sm" style="text-decoration:none" href="dashboard.html?client=${c.id}">View dashboard →</a>
+        <a class="bt-btn bt-btn--ghost bt-btn--sm" style="text-decoration:none" href="dashboard.html?client=${encodeURIComponent(c.id)}">View dashboard →</a>
       </div>
     `).join("");
   }

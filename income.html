@@ -121,11 +121,11 @@
     const rows = [...store.income].sort((a, b) => (b.entry_date + b.created_at).localeCompare(a.entry_date + a.created_at)).slice(0, 8);
     if (!rows.length) { wrap.innerHTML = '<div class="bt-empty">Nothing logged yet.</div>'; return; }
     wrap.innerHTML = rows.map((r) => {
-      const via = r.payment_type ? r.payment_type + (r.payment_account ? " · " + r.payment_account : "") : "";
+      const via = r.payment_type ? btEscapeHtml(r.payment_type) + (r.payment_account ? " · " + btEscapeHtml(r.payment_account) : "") : "";
       return `
       <div class="bt-list-row">
         <div>
-          <div>${r.source}${r._pending ? '<span class="bt-pending-dot" title="Syncing"></span>' : ""}</div>
+          <div>${btEscapeHtml(r.source)}${r._pending ? '<span class="bt-pending-dot" title="Syncing"></span>' : ""}</div>
           <div class="meta">${r.frequency} · ${r.entry_date}${via ? " · " + via : ""}</div>
         </div>
         <div class="amt">${fmtMoney(r.amount, r.currency || home)}</div>
