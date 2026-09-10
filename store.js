@@ -249,6 +249,76 @@ function btGuessAmountFromText(text) {
   return allNums.length ? Math.max(...allNums) : null;
 }
 
+const BT_MONTH_NAMES = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
+
+/**
+ * Pulls a date out of OCR'd receipt/bill text, returned as YYYY-MM-DD.
+ * Tries ISO (2026-01-05), "5 Jan 2026" / "Jan 5, 2026", then a bare
+ * numeric d/m/y or m/d/y — whichever part can't be a month (>12) settles
+ * which it is; a genuinely ambiguous pair assumes day/month/year, the
+ * convention on most bills here. Returns null if nothing looks like a
+ * date, so the caller can fall back to today.
+ */
+function btGuessDateFromText(text) {
+  if (!text) return null;
+  const pad = (n) => String(n).padStart(2, "0");
+  const fullYear = (y) => (String(y).length === 2 ? (Number(y) > 70 ? "19" + y : "20" + y) : String(y));
+  const monthNum = (name) => BT_MONTH_NAMES.indexOf(name.slice(0, 3).toLowerCase()) + 1;
+  const valid = (y, m, d) => m >= 1 && m <= 12 && d >= 1 && d <= 31 && y >= 2000 && y <= 2100;
+  const monthRe = "(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\\.?";
+
+  const iso = text.match(/\b(20\d{2})[\/\-](\d{1,2})[\/\-](\d{1,2})\b/);
+  if (iso) {
+    const y = +iso[1], m = +iso[2], d = +iso[3];
+    if (valid(y, m, d)) return `${y}-${pad(m)}-${pad(d)}`;
+  }
+
+  const monthDayYear = text.match(new RegExp(`\\b${monthRe}\\s+(\\d{1,2}),?\\s+(\\d{2,4})\\b`, "i"));
+  if (monthDayYear) {
+    const m = monthNum(monthDayYear[1]), d = +monthDayYear[2], y = +fullYear(monthDayYear[3]);
+    if (valid(y, m, d)) return `${y}-${pad(m)}-${pad(d)}`;
+  }
+
+  const dayMonthYear = text.match(new RegExp(`\\b(\\d{1,2})\\s+${monthRe},?\\s+(\\d{2,4})\\b`, "i"));
+  if (dayMonthYear) {
+    const d = +dayMonthYear[1], m = monthNum(dayMonthYear[2]), y = +fullYear(dayMonthYear[3]);
+    if (valid(y, m, d)) return `${y}-${pad(m)}-${pad(d)}`;
+  }
+
+  const slash = text.match(/\b(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})\b/);
+  if (slash) {
+    const y = +fullYear(slash[3]);
+    const a = +slash[1], b = +slash[2];
+    let day, month;
+    if (a > 12 && b <= 12) { day = a; month = b; }
+    else if (b > 12 && a <= 12) { day = b; month = a; }
+    else { day = a; month = b; }
+    if (valid(y, month, day)) return `${y}-${pad(month)}-${pad(day)}`;
+  }
+
+  return null;
+}
+
+/**
+ * Best-effort merchant/location guess from OCR'd receipt text — receipts
+ * almost always lead with the business name, so this returns the first
+ * non-empty line that isn't obviously boilerplate (address/phone/website,
+ * "receipt", "invoice", ...) or a bare number/date/phone-looking string.
+ */
+function btGuessMerchantFromText(text) {
+  if (!text) return null;
+  const skipRe = /^\s*(receipt|invoice|tax invoice|customer copy|thank you|tel|phone|www\.|http)/i;
+  const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  for (const line of lines) {
+    if (skipRe.test(line)) continue;
+    if (/^[\d\s\-\/.,:]+$/.test(line)) continue;
+    const letters = line.replace(/[^a-zA-Z]/g, "");
+    if (letters.length < 3) continue;
+    return line.length > 60 ? line.slice(0, 60) : line;
+  }
+  return null;
+}
+
 /** Currencies a client can pick from: their home currency first, then the configured extras. */
 function btCurrencyOptions(profile) {
   const home = profile?.currency || "TTD";
@@ -301,6 +371,18 @@ function btSumExpenseCategoryInRange(entries, category, start, end, viewCurrency
   return entries
     .filter((e) => e.category === category && btDateInRange(e.expense_date, start, end))
     .reduce((s, e) => s + btConvertAmount(Number(e.amount), home, viewCurrency, profile).value, 0);
+}
+
+/** Income entries in range, grouped by source and converted into viewCurrency — feeds the cash flow statement. */
+function btIncomeBreakdownBySource(entries, start, end, viewCurrency, profile) {
+  const home = profile?.currency || "TTD";
+  const totals = {};
+  entries.forEach((e) => {
+    if (!btDateInRange(e.entry_date, start, end)) return;
+    const { value } = btConvertAmount(Number(e.amount), e.currency || home, viewCurrency, profile);
+    totals[e.source] = (totals[e.source] || 0) + value;
+  });
+  return totals;
 }
 
 /** Raw (unconverted) income totals grouped by their own entry currency — the "per-currency" view alongside the unified one. */
@@ -374,10 +456,42 @@ function btGoalProgress(store) {
   });
 }
 
-function btLiabilityProgress(store) {
+/**
+ * Debt progress, plus — when a target_payoff_date is set — a pace reading
+ * so "60% paid off" also comes with "on track" or "behind": expected
+ * progress is elapsed time / total time from when the debt was added to
+ * its target date, compared against actual amount paid via the tracker.
+ */
+function btLiabilityProgress(store, today = new Date()) {
+  const todayStr = today.toISOString().slice(0, 10);
   return store.liabilities.map((l) => {
-    const paid = store.expenses.filter((e) => e.liability_id === l.id).reduce((s, e) => s + Number(e.amount), 0);
-    return { ...l, paid_via_tracker: paid, estimated_remaining: Math.max(0, Number(l.current_balance) - paid) };
+    const linkedExpenses = store.expenses.filter((e) => e.liability_id === l.id);
+    const paid = linkedExpenses.reduce((s, e) => s + Number(e.amount), 0);
+    const estimated_remaining = Math.max(0, Number(l.current_balance) - paid);
+    const result = { ...l, paid_via_tracker: paid, estimated_remaining };
+
+    if (l.target_payoff_date) {
+      const startStr = (l.created_at || todayStr).slice(0, 10);
+      const totalDays = Math.max(1, (new Date(l.target_payoff_date) - new Date(startStr)) / 86400000);
+      const elapsedDays = Math.max(0, (today - new Date(startStr)) / 86400000);
+      const expected_paid_pct = Math.min(1, elapsedDays / totalDays);
+      const actual_paid_pct = Number(l.current_balance) > 0 ? Math.min(1, paid / Number(l.current_balance)) : 1;
+      const overdue = todayStr > l.target_payoff_date && estimated_remaining > 0;
+
+      let pace_status;
+      if (overdue) pace_status = "red";
+      else if (actual_paid_pct >= expected_paid_pct) pace_status = "green";
+      else if (actual_paid_pct >= expected_paid_pct * 0.7) pace_status = "yellow";
+      else pace_status = "red";
+
+      const lastPaymentDate = linkedExpenses.reduce((latest, e) => (!latest || e.expense_date > latest ? e.expense_date : latest), null);
+      const days_since_payment = Math.floor((today - new Date(lastPaymentDate || startStr)) / 86400000);
+      const needs_payment_reminder = estimated_remaining > 0 && days_since_payment >= 45;
+
+      Object.assign(result, { pace_status, expected_paid_pct, actual_paid_pct, overdue, days_since_payment, needs_payment_reminder });
+    }
+
+    return result;
   });
 }
 
@@ -408,7 +522,7 @@ function btDisposableIncome(store, summary) {
 }
 
 /** Red/Yellow/Green health flags, thresholds straight from the source spreadsheet's guideline sheets. */
-function btHealthFlags(store, summary) {
+function btHealthFlags(store, summary, today = new Date()) {
   const T = BT_CONFIG.THRESHOLDS;
   const flags = [];
   const monthNet = summary.periods.month.net;
@@ -455,6 +569,18 @@ function btHealthFlags(store, summary) {
     if (disposable > 0 && disposable / monthIncome >= 0.10) {
       flags.push({ level: "green", text: `You have disposable income this month beyond essentials and savings — a chance to invest more or top up a goal.` });
     }
+  }
+
+  const debtsWithTargets = btLiabilityProgress(store, today).filter((l) => l.target_payoff_date && l.estimated_remaining > 0);
+  const worstBehind = debtsWithTargets.filter((l) => l.pace_status === "red").sort((a, b) => a.expected_paid_pct - a.actual_paid_pct < b.expected_paid_pct - b.actual_paid_pct ? 1 : -1)[0];
+  if (worstBehind) {
+    flags.push({ level: "red", text: worstBehind.overdue
+      ? `${worstBehind.debt_name} is past its target payoff date — a top-up now keeps it from dragging on.`
+      : `${worstBehind.debt_name} is behind pace to be paid off by ${worstBehind.target_payoff_date} — consider a top-up payment.` });
+  }
+  const needsReminder = debtsWithTargets.find((l) => l.needs_payment_reminder);
+  if (needsReminder) {
+    flags.push({ level: "yellow", text: `No payment logged toward ${needsReminder.debt_name} in ${needsReminder.days_since_payment} days — a quick payment keeps it on track for ${needsReminder.target_payoff_date}.` });
   }
 
   return flags;

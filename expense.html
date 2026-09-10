@@ -21,6 +21,13 @@
   #scan-status.show { display: block; }
   #category-hint { font-size: 0.76rem; color: var(--bt-gold); margin: -12px 0 12px; display: none; }
   #category-hint.show { display: block; }
+  #scan-privacy-note { font-size: 0.76rem; color: var(--bt-muted); margin: -10px 0 16px; }
+  #category-bubble { display: none; background: rgba(194,145,51,0.08); border: 1px solid var(--bt-gold); border-radius: var(--bt-radius); padding: 14px; margin-bottom: 16px; }
+  #category-bubble.show { display: block; }
+  #category-bubble p { margin: 0 0 10px; font-size: 0.86rem; }
+  .bt-chip-row { display: flex; flex-wrap: wrap; gap: 8px; }
+  .bt-chip { border: 1px solid var(--bt-border); background: var(--bt-white); border-radius: 999px; padding: 7px 14px; font-size: 0.82rem; font-family: inherit; cursor: pointer; }
+  .bt-chip--selected { background: var(--bt-gold); border-color: var(--bt-gold); color: #fff; }
 </style>
 </head>
 <body>
@@ -35,9 +42,15 @@
   </div>
   <p class="bt-sub">Say what it was and how much — we'll sort out the category. Saves instantly, even with no signal.</p>
 
-  <button class="bt-btn bt-btn--ghost" id="scan-btn" style="margin-bottom:16px">📷 Scan a bill or receipt</button>
+  <button class="bt-btn bt-btn--ghost" id="scan-btn" style="margin-bottom:8px">📷 Scan a bill or receipt</button>
   <input type="file" id="scan-file" accept="image/*" capture="environment" style="display:none" />
+  <p id="scan-privacy-note">Photos are read on your device only — never uploaded or saved. The image is discarded the moment we've pulled out the details.</p>
   <p id="scan-status"></p>
+
+  <div id="category-bubble">
+    <p>Scanned <strong id="bubble-summary"></strong> — what category is this?</p>
+    <div class="bt-chip-row" id="bubble-chips"></div>
+  </div>
 
   <div class="bt-card">
     <label for="f-desc" data-tip="What was this for? Examples: &quot;Rent&quot;, &quot;KFC lunch&quot;, &quot;T&amp;TEC bill&quot;, &quot;Netflix&quot;. We'll guess the category from this.">What was it for?</label>
@@ -171,8 +184,37 @@
     return scanLib;
   }
 
+  function hideCategoryBubble() {
+    document.getElementById("category-bubble").classList.remove("show");
+  }
+
+  function showCategoryBubble(guessedCategory, meta) {
+    const bubble = document.getElementById("category-bubble");
+    const parts = [];
+    if (meta.amount) parts.push(fmtMoney(meta.amount));
+    if (meta.merchant) parts.push("at " + meta.merchant);
+    if (meta.date) parts.push("on " + meta.date);
+    document.getElementById("bubble-summary").textContent = parts.length ? parts.join(" ") : "this bill";
+
+    const chips = document.getElementById("bubble-chips");
+    chips.innerHTML = BT_CONFIG.EXPENSE_CATEGORIES.map((c) => `<button type="button" class="bt-chip${c === guessedCategory ? " bt-chip--selected" : ""}" data-category="${c}">${c}</button>`).join("");
+    chips.querySelectorAll(".bt-chip").forEach((chip) => {
+      chip.addEventListener("click", () => {
+        const category = chip.dataset.category;
+        document.getElementById("f-category").value = category;
+        categoryManuallySet = true;
+        document.getElementById("category-hint").classList.remove("show");
+        updateLinkOptions();
+        toast("Category set to " + category);
+        hideCategoryBubble();
+      });
+    });
+    bubble.classList.add("show");
+  }
+
   async function handleScanFile(file) {
     const statusEl = document.getElementById("scan-status");
+    hideCategoryBubble();
     statusEl.classList.add("show");
     statusEl.textContent = "Loading scanner…";
     try {
@@ -183,17 +225,23 @@
       });
       const text = data.text || "";
       const amount = btGuessAmountFromText(text);
+      const date = btGuessDateFromText(text);
+      const merchant = btGuessMerchantFromText(text);
       const category = btGuessCategory(text);
+
       if (amount) document.getElementById("f-amount").value = amount.toFixed(2);
+      if (date) document.getElementById("f-date").value = date;
+      if (merchant && !document.getElementById("f-desc").value.trim()) document.getElementById("f-desc").value = merchant;
       if (category) {
         document.getElementById("f-category").value = category;
         categoryManuallySet = true; // trust the scan over further auto-guessing from the description field
-        document.getElementById("category-hint").classList.add("show");
       }
       updateLinkOptions();
+
       statusEl.textContent = amount
-        ? "Got it — double-check the amount and category below before saving."
-        : "Couldn't find a clear total — fill in the amount yourself; category guess (if any) is below.";
+        ? "Image discarded — nothing was uploaded or saved. Double-check the details below before saving."
+        : "Couldn't find a clear total — image discarded, fill in the amount yourself.";
+      showCategoryBubble(category, { amount, merchant, date });
     } catch (err) {
       console.error("Black Tree bill scan failed", err);
       statusEl.textContent = "Couldn't read that image — enter the details manually below.";
@@ -248,6 +296,7 @@
       document.getElementById("f-amount").value = "";
       document.getElementById("scan-status").classList.remove("show");
       document.getElementById("category-hint").classList.remove("show");
+      hideCategoryBubble();
       categoryManuallySet = false;
     });
 

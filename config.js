@@ -34,7 +34,7 @@ const BT_CONFIG = {
      so the single Expense Tracker shortcut can feed the whole dashboard. */
   EXPENSE_CATEGORIES: [
     "Housing", "Utilities", "Transport", "Food", "Personal",
-    "Insurance", "Debt Repayment", "Savings & Investments", "Education", "Other"
+    "Insurance", "Debt Repayment", "Savings & Investments", "Education", "Taxes", "Other"
   ],
 
   /* Categories that can optionally be tagged to a goal or a debt so that
@@ -42,13 +42,13 @@ const BT_CONFIG = {
   GOAL_LINK_CATEGORY: "Savings & Investments",
   DEBT_LINK_CATEGORY: "Debt Repayment",
 
-  GOAL_CATEGORIES: ["Debt Reduction", "Investing", "Education", "Emergency Fund", "Personal", "Other"],
+  GOAL_CATEGORIES: ["Debt Reduction", "Investing", "Education", "Emergency Fund", "Taxes", "Personal", "Other"],
 
   /* Categories treated as "cost of living" — the baseline that has to keep
      running no matter what. Everything else (Personal, Education, Other)
      counts as discretionary. Used for the Cost of Living / Disposable
      Income breakdown, not stored per-client — the same split for everyone. */
-  ESSENTIAL_CATEGORIES: ["Housing", "Utilities", "Transport", "Food", "Insurance", "Debt Repayment"],
+  ESSENTIAL_CATEGORIES: ["Housing", "Utilities", "Transport", "Food", "Insurance", "Debt Repayment", "Taxes"],
 
   /* Auto-categorization: as a client types what an expense was for (or a
      scanned bill's text), the first category whose keyword appears in that
@@ -64,6 +64,7 @@ const BT_CONFIG = {
     "Debt Repayment": ["loan payment", "car loan", "credit card payment", "mortgage payment", "loan installment"],
     "Savings & Investments": ["savings", "investment", "mutual fund", "stocks", "utc", "deposit"],
     "Education": ["school", "tuition", "textbook", "books", "course", "exam fee"],
+    "Taxes": ["tax", "board of inland revenue", "bir", "vat", "property tax", "income tax"],
     "Personal": ["netflix", "spotify", "gym", "haircut", "salon", "shopping", "clothes", "subscription"]
   },
 
