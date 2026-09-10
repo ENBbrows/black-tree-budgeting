@@ -5,7 +5,7 @@
    requests fall back to network-first so a live connection always
    wins when available, cache when it isn't. */
 
-const BT_CACHE = "blacktree-shell-v4";
+const BT_CACHE = "blacktree-shell-v5";
 
 const BT_PRECACHE = [
   "login.html",
@@ -15,6 +15,7 @@ const BT_PRECACHE = [
   "statement.html",
   "agent.html",
   "setup-guide.html",
+  "privacy.html",
   "offline.html",
   "config.js",
   "auth.js",
