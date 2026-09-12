@@ -44,10 +44,12 @@ a { color: var(--bt-gold); }
 
 .bt-header {
   display: flex; align-items: center; justify-content: center;
+  gap: 10px;
   padding: 22px 16px 14px; text-align: center;
 }
 .bt-header img { height: 40px; }
 .bt-header--row { justify-content: space-between; text-align: left; }
+.bt-brand { display: flex; align-items: center; gap: 8px; }
 
 h1, h2, h3 { font-family: var(--bt-font-head); font-weight: 600; margin: 0 0 6px; letter-spacing: -0.01em; }
 h1 { font-size: 1.5rem; }
