@@ -615,6 +615,26 @@ function btHealthFlags(store, summary, today = new Date()) {
   return flags;
 }
 
+/**
+ * Whether now looks like a good moment to prompt "talk to your advisor
+ * about investing more": a healthy, balanced budget (no red flags this
+ * month) plus meaningful disposable income beyond essentials and
+ * savings. Re-evaluated on every render, so the prompt naturally shows
+ * up again any time it becomes true — no separate notification system
+ * needed.
+ */
+function btInvestmentOpportunity(store, summary, flags) {
+  const healthFlags = flags || btHealthFlags(store, summary);
+  const hasRedFlag = healthFlags.some((f) => f.level === "red");
+  const monthIncome = summary.periods.month.income;
+  const { disposable } = btDisposableIncome(store, summary);
+  const disposablePct = monthIncome > 0 ? disposable / monthIncome : 0;
+  return {
+    eligible: !hasRedFlag && monthIncome > 0 && disposablePct >= 0.10,
+    disposable, disposablePct
+  };
+}
+
 /* ── Protection & Retirement Planner — standard coverage multiples
    applied to a client's own income (BT_CONFIG.PROTECTION). These are
    guideline figures to open a conversation with an advisor, never a
@@ -685,4 +705,31 @@ function btBurialFundItemValues(profile) {
 /** Burial Fund total — sum of the current per-item estimates (saved overrides or defaults). */
 function btBurialFundTotal(profile) {
   return btBurialFundItemValues(profile).reduce((s, it) => s + Number(it.value || 0), 0);
+}
+
+/**
+ * Whether every base is covered: Emergency Fund, Critical Illness Fund,
+ * and Burial Fund each have a linked goal saved at or beyond its target.
+ * This is the gate for unlocking the Vacation Vault — Life Insurance and
+ * Retirement aren't included here since neither has a trackable "amount
+ * saved so far" the way a goal does.
+ */
+function btProtectionFullyCovered(store, viewCurrency, profile) {
+  const goals = btGoalProgress(store);
+  const isCovered = (category, target) => {
+    const linked = goals.filter((g) => g.category === category);
+    if (!linked.length || !(target > 0)) return false;
+    const saved = linked.reduce((s, g) => s + g.saved_amount, 0);
+    return saved >= target;
+  };
+  const ef = btEmergencyFundTarget(store, viewCurrency, profile?.emergency_fund_months);
+  const ci = btCriticalIllnessFundTarget(store, viewCurrency);
+  const bfTarget = btBurialFundTotal(profile);
+  return isCovered("Emergency Fund", ef.target) && isCovered("Critical Illness Fund", ci.target) && isCovered("Burial Fund", bfTarget);
+}
+
+/** Suggested monthly Vacation Vault contribution — a client-chosen percentage (0-100) of this month's disposable income. */
+function btVacationVaultSuggestion(disposable, pct) {
+  const p = Math.max(0, Math.min(100, Number(pct) || 0));
+  return { pct: p, monthlyContribution: Math.max(0, disposable) * (p / 100) };
 }

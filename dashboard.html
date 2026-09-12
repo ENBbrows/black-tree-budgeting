@@ -74,6 +74,12 @@
 
   <div id="bt-flags"></div>
 
+  <div class="bt-card bt-invest-card" id="invest-cta" style="display:none">
+    <h2>💬 Room to invest more</h2>
+    <p id="invest-cta-text">Your budget's healthy and you have disposable income beyond essentials and savings — a good moment to talk with your advisor about your Emergency Fund, Critical Illness and Life Insurance coverage, retirement contributions, or other ways to secure your family's future.</p>
+    <a class="bt-btn bt-btn--gold" id="invest-cta-btn" href="#" target="_blank" rel="noopener">Talk to Your Advisor</a>
+  </div>
+
   <div class="bt-dash-grid">
     <div>
       <div class="bt-card">
@@ -281,6 +287,20 @@
     const wrap = document.getElementById("bt-flags");
     if (!flags.length) { wrap.innerHTML = ""; return; }
     wrap.innerHTML = flags.map((f) => `<div class="bt-flag bt-flag--${f.level}"><span class="dot"></span><span>${f.text}</span></div>`).join("");
+  }
+
+  function renderInvestCta(store, summary, flags) {
+    const card = document.getElementById("invest-cta");
+    if (readOnly) { card.style.display = "none"; return; }
+    const opp = btInvestmentOpportunity(store, summary, flags);
+    if (!opp.eligible) { card.style.display = "none"; return; }
+    card.style.display = "";
+    document.getElementById("invest-cta-text").textContent =
+      `Your budget's healthy and you have ${fmtMoney(opp.disposable)} in disposable income this month beyond essentials and savings — a good moment to talk with your advisor about your Emergency Fund, Critical Illness and Life Insurance coverage, retirement contributions, or other ways to secure your family's future.`;
+    const subject = "I'd like to talk about investing more";
+    const body = `Hi,\n\nMy budget's in a healthy place and I have some disposable income (about ${fmtMoney(opp.disposable)} this month) that I'd like to put to work. Could we set up a time to talk about my options — Emergency Fund, Critical Illness cover, Life Insurance, retirement, or other investments?\n\nThanks!`;
+    document.getElementById("invest-cta-btn").href =
+      `mailto:${BT_CONFIG.SUPPORT_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   }
 
   function renderStats(elId, period) {
@@ -562,7 +582,9 @@
     renderCurrencySelector(store);
 
     const summary = btDashboardSummary(store, viewCurrency);
-    renderFlags(btHealthFlags(store, summary));
+    const flags = btHealthFlags(store, summary);
+    renderFlags(flags);
+    renderInvestCta(store, summary, flags);
     renderStats("stats-week", summary.periods.week);
     renderStats("stats-month", summary.periods.month);
     renderStats("stats-ytd", summary.periods.ytd);

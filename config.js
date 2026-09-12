@@ -42,7 +42,7 @@ const BT_CONFIG = {
   GOAL_LINK_CATEGORY: "Savings & Investments",
   DEBT_LINK_CATEGORY: "Debt Repayment",
 
-  GOAL_CATEGORIES: ["Debt Reduction", "Investing", "Education", "Emergency Fund", "Critical Illness Fund", "Burial Fund", "Taxes", "Personal", "Other"],
+  GOAL_CATEGORIES: ["Debt Reduction", "Investing", "Education", "Emergency Fund", "Critical Illness Fund", "Burial Fund", "Vacation Vault", "Taxes", "Personal", "Other"],
 
   /* Categories treated as "cost of living" — the baseline that has to keep
      running no matter what. Everything else (Personal, Education, Other)

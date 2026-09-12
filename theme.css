@@ -190,6 +190,14 @@ label[data-tip]::after {
 .bt-onboard-card p { color: var(--bt-cream); opacity: 0.85; }
 .bt-onboard-card .bt-btn { width: auto; }
 
+.bt-invest-card {
+  background: var(--bt-green-bg); border: 1px solid var(--bt-green);
+  border-radius: var(--bt-radius); padding: 18px 20px; margin-bottom: 16px;
+}
+.bt-invest-card h2 { color: var(--bt-ink); margin-bottom: 6px; }
+.bt-invest-card p { margin-bottom: 14px; }
+.bt-invest-card .bt-btn { width: auto; text-decoration: none; }
+
 .bt-quick-actions { display: flex; gap: 10px; margin: 14px 0 18px; flex-wrap: wrap; }
 .bt-quick-actions a { flex: 1; min-width: 160px; text-decoration: none; }
 

@@ -27,6 +27,10 @@
   .bf-item input { width: 110px; flex: none; text-align: right; }
   .bf-total { display: flex; justify-content: space-between; align-items: baseline; padding-top: 14px; margin-top: 6px; border-top: 2px solid var(--bt-ink); }
   .bf-total .amt { font-family: var(--bt-font-head); font-size: 1.3rem; font-weight: 700; }
+  .vv-locked-note { font-size: 0.86rem; color: var(--bt-muted); background: var(--bt-cream); border-radius: 10px; padding: 12px 14px; margin-bottom: 14px; }
+  .vv-unlocked-note { font-size: 0.86rem; color: var(--bt-green); margin: 0 0 14px; }
+  #vv-card.vv-locked .prot-field-row, #vv-card.vv-locked .prot-target { opacity: 0.45; }
+  #vv-card input:disabled, #vv-card button:disabled { cursor: not-allowed; opacity: 0.6; }
 </style>
 </head>
 <body>
@@ -88,6 +92,22 @@
     </div>
     <div id="bf-goal-progress"></div>
     <button class="bt-btn bt-btn--gold bt-btn--sm" id="bf-save" style="margin-top:16px">Save breakdown</button>
+  </div>
+
+  <div class="bt-card" id="vv-card">
+    <h2 data-tip="Once your Emergency Fund, Critical Illness Fund, and Burial Fund are all fully funded, this unlocks so you can start setting aside a percentage of your disposable income for a Vacation Vault.">🌴 Vacation Vault</h2>
+    <div id="vv-locked-note" class="vv-locked-note">🔒 Fully fund your Emergency Fund, Critical Illness Fund, and Burial Fund first — this unlocks once all three are covered.</div>
+    <div id="vv-unlocked-note" class="vv-unlocked-note" style="display:none">🔓 Every base is covered — time to start putting something aside for the fun stuff.</div>
+    <p class="prot-basis" id="vv-basis">—</p>
+    <div class="prot-field-row">
+      <div>
+        <label for="vv-pct" style="margin:0 0 4px;display:block;font-size:0.82rem">% of disposable income</label>
+        <input id="vv-pct" type="number" min="0" max="100" step="1" disabled />
+      </div>
+      <button class="bt-btn bt-btn--gold bt-btn--sm" id="vv-save" disabled>Update</button>
+    </div>
+    <div class="prot-target" id="vv-target">—</div>
+    <div id="vv-saved"></div>
   </div>
 
   <p class="bt-sub" style="text-align:center;margin-top:24px"><a href="dashboard.html">← Back to Dashboard</a></p>
@@ -158,6 +178,40 @@
     document.getElementById("bf-goal-progress").innerHTML = goalProgressHtml(btLoadStore(btUid), "Burial Fund", total, currency);
   }
 
+  function renderVacationVault(store) {
+    const profile = store.profile;
+    const currency = profile?.currency || "TTD";
+    const card = document.getElementById("vv-card");
+    const pctInput = document.getElementById("vv-pct");
+    const saveBtn = document.getElementById("vv-save");
+
+    const unlocked = btProtectionFullyCovered(store, currency, profile);
+    document.getElementById("vv-locked-note").style.display = unlocked ? "none" : "";
+    document.getElementById("vv-unlocked-note").style.display = unlocked ? "" : "none";
+    card.classList.toggle("vv-locked", !unlocked);
+    pctInput.disabled = !unlocked;
+    saveBtn.disabled = !unlocked;
+    pctInput.value = profile?.vacation_vault_pct ?? 10;
+
+    const linked = btGoalProgress(store).filter((g) => g.category === "Vacation Vault");
+    const saved = linked.reduce((s, g) => s + g.saved_amount, 0);
+    document.getElementById("vv-saved").innerHTML = linked.length
+      ? `<p class="prot-note">${fmtMoney(saved, currency)} saved so far toward your Vacation Vault.</p>`
+      : `<p class="prot-note">Add a "Vacation Vault" goal from the Dashboard to start tracking what you've saved.</p>`;
+
+    if (!unlocked) {
+      document.getElementById("vv-basis").textContent = "";
+      document.getElementById("vv-target").textContent = "—";
+      return;
+    }
+
+    const summary = btDashboardSummary(store, currency);
+    const { disposable } = btDisposableIncome(store, summary);
+    const suggestion = btVacationVaultSuggestion(disposable, pctInput.value);
+    document.getElementById("vv-basis").textContent = `${suggestion.pct}% of this month's disposable income (${fmtMoney(disposable, currency)}).`;
+    document.getElementById("vv-target").textContent = `${fmtMoney(suggestion.monthlyContribution, currency)}/month suggested`;
+  }
+
   function renderAll(store) {
     const profile = store.profile;
     const currency = profile?.currency || "TTD";
@@ -191,6 +245,7 @@
     }
 
     renderBurialFund(profile, currency);
+    renderVacationVault(store);
   }
 
   async function init() {
@@ -225,6 +280,15 @@
       store = btLoadStore(btUid);
       renderAll(store);
       toast("Burial fund breakdown saved");
+    });
+
+    document.getElementById("vv-save").addEventListener("click", () => {
+      const pct = Math.max(0, Math.min(100, Math.round(parseFloat(document.getElementById("vv-pct").value)) || 0));
+      document.getElementById("vv-pct").value = pct;
+      btUpdateProfile(btUid, { vacation_vault_pct: pct });
+      store = btLoadStore(btUid);
+      renderAll(store);
+      toast("Vacation Vault updated");
     });
 
     if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
