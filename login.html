@@ -22,6 +22,9 @@
   #bt-status.err { color: var(--bt-red); }
   #bt-status.ok { color: var(--bt-green); }
   .bt-note { font-size: 0.78rem; color: var(--bt-muted); margin-top: 22px; line-height: 1.5; }
+  #bt-password-wrap { display:none; margin-top: 14px; }
+  #bt-password-wrap.show { display:block; }
+  .bt-toggle-link { display:block; text-align:center; font-size: 0.82rem; margin-top: 14px; cursor:pointer; background:none; border:none; color: var(--bt-gold); font-family: inherit; padding:0; }
 </style>
 </head>
 <body>
@@ -31,16 +34,22 @@
 
   <div class="bt-card" style="text-align:left">
     <h1 style="text-align:center">Sign in</h1>
-    <p class="bt-sub" style="text-align:center">We'll email you a secure one-time link — no password to remember or share.</p>
-    <label for="bt-email" data-tip="The email you'll use to sign in — we'll send a secure link here. No password needed.">Email address</label>
+    <p class="bt-sub" style="text-align:center" id="bt-mode-sub">First time, or haven't set a password yet? We'll email you a secure one-time link.</p>
+    <label for="bt-email" data-tip="The email you'll use to sign in.">Email address</label>
     <input id="bt-email" type="email" inputmode="email" autocomplete="email" placeholder="you@email.com" />
+    <div id="bt-password-wrap">
+      <label for="bt-password">Password</label>
+      <input id="bt-password" type="password" autocomplete="current-password" placeholder="Your password" />
+    </div>
     <button class="bt-btn bt-btn--gold" id="bt-send" style="margin-top:18px">Send secure link</button>
+    <button class="bt-toggle-link" id="bt-mode-toggle" type="button">Have a password? Sign in directly →</button>
     <div id="bt-status"></div>
   </div>
 
   <p class="bt-note">
-    Each link is single-use and expires shortly after it's sent, and only works for the email address it was sent to —
-    forwarding it to someone else won't give them access to your data.
+    A one-time link is single-use, expires shortly after it's sent, and only works for the email address it was sent to —
+    forwarding it to someone else won't give them access to your data. Once signed in, you can set a password from your
+    Dashboard to sign in directly, as many times as you like, without waiting on another email.
   </p>
   <p class="bt-note"><a href="privacy.html">🔒 How we protect your privacy →</a></p>
 </div>
@@ -63,8 +72,26 @@
     const statusEl = document.getElementById("bt-status");
     const btn = document.getElementById("bt-send");
     const emailEl = document.getElementById("bt-email");
+    const passwordWrap = document.getElementById("bt-password-wrap");
+    const passwordEl = document.getElementById("bt-password");
+    const modeToggle = document.getElementById("bt-mode-toggle");
+    const modeSub = document.getElementById("bt-mode-sub");
+    let passwordMode = false;
 
-    btn.addEventListener("click", async () => {
+    function setMode(usePassword) {
+      passwordMode = usePassword;
+      passwordWrap.classList.toggle("show", passwordMode);
+      btn.textContent = passwordMode ? "Sign in" : "Send secure link";
+      modeToggle.textContent = passwordMode ? "← Use a one-time email link instead" : "Have a password? Sign in directly →";
+      modeSub.textContent = passwordMode
+        ? "Sign in with the password you set from your Dashboard."
+        : "First time, or haven't set a password yet? We'll email you a secure one-time link.";
+      statusEl.textContent = "";
+      statusEl.className = "";
+    }
+    modeToggle.addEventListener("click", () => setMode(!passwordMode));
+
+    async function submit() {
       const email = emailEl.value.trim();
       if (!email || !email.includes("@")) {
         statusEl.textContent = "Enter a valid email address.";
@@ -72,26 +99,53 @@
         return;
       }
       if (!navigator.onLine) {
-        statusEl.textContent = "You're offline — signing in for the first time needs a connection.";
+        statusEl.textContent = "You're offline — signing in needs a connection.";
         statusEl.className = "err";
         return;
       }
+      const resetBtn = passwordMode ? "Sign in" : "Send secure link";
       btn.disabled = true;
-      btn.textContent = "Sending…";
       statusEl.textContent = "";
       statusEl.className = "";
-      try {
-        await btSendMagicLink(email);
-        statusEl.textContent = "Check your email for the link — it may take a minute to arrive.";
-        statusEl.className = "ok";
-        btn.textContent = "Link sent";
-      } catch (err) {
-        statusEl.textContent = err.message || "Couldn't send the link. Try again.";
-        statusEl.className = "err";
-        btn.disabled = false;
-        btn.textContent = "Send secure link";
+
+      if (passwordMode) {
+        const password = passwordEl.value;
+        if (!password) {
+          statusEl.textContent = "Enter your password.";
+          statusEl.className = "err";
+          btn.disabled = false;
+          return;
+        }
+        btn.textContent = "Signing in…";
+        try {
+          await btSignInWithPassword(email, password);
+          const params = new URLSearchParams(window.location.search);
+          window.location.replace(params.get("redirect") || "dashboard.html");
+        } catch (err) {
+          statusEl.textContent = "Incorrect email or password — or you haven't set one up yet. Use the one-time link below instead.";
+          statusEl.className = "err";
+          btn.disabled = false;
+          btn.textContent = resetBtn;
+        }
+      } else {
+        btn.textContent = "Sending…";
+        try {
+          await btSendMagicLink(email);
+          statusEl.textContent = "Check your email for the link — it may take a minute to arrive.";
+          statusEl.className = "ok";
+          btn.textContent = "Link sent";
+        } catch (err) {
+          statusEl.textContent = err.message || "Couldn't send the link. Try again.";
+          statusEl.className = "err";
+          btn.disabled = false;
+          btn.textContent = resetBtn;
+        }
       }
-    });
+    }
+
+    btn.addEventListener("click", submit);
+    passwordEl.addEventListener("keydown", (e) => { if (e.key === "Enter") submit(); });
+    emailEl.addEventListener("keydown", (e) => { if (e.key === "Enter" && passwordMode) submit(); });
 
     if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
   })();

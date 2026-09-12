@@ -22,6 +22,7 @@
   .bt-topbar-right { display:flex; align-items:center; gap:10px; }
   .bt-agent-banner { background: var(--bt-ink); color: var(--bt-white); text-align:center; padding: 10px; font-size: 0.85rem; }
   .bt-agent-banner a { color: var(--bt-gold-light); }
+  #setpw-status.err { color: var(--bt-red); }
   canvas { width: 100%; display:block; }
   .bt-section-head { display:flex; align-items:center; justify-content:space-between; margin: 26px 0 10px; }
   .bt-mini-form { display:none; margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--bt-border); }
@@ -60,6 +61,20 @@
   </div>
 
   <div id="bt-onboard" style="display:none"></div>
+
+  <div class="bt-card bt-invest-card" id="setpw-card" style="display:none">
+    <h2>🔑 Set a password for faster sign-in</h2>
+    <p class="bt-sub" style="margin-bottom:12px">Right now you can only sign in with a fresh one-time link each time. Set a password once and you can sign in directly, as many times as you like, with no email wait.</p>
+    <div class="bt-field-row">
+      <div><label for="setpw-password">New password</label><input id="setpw-password" type="password" autocomplete="new-password" placeholder="At least 8 characters" /></div>
+      <div><label for="setpw-confirm">Confirm password</label><input id="setpw-confirm" type="password" autocomplete="new-password" placeholder="Re-enter password" /></div>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap">
+      <button class="bt-btn bt-btn--gold" id="setpw-save">Set password</button>
+      <button class="bt-btn bt-btn--ghost" id="setpw-dismiss">Maybe later</button>
+    </div>
+    <div id="setpw-status" style="font-size:0.86rem;margin-top:10px;min-height:1.2em"></div>
+  </div>
 
   <div class="bt-quick-actions">
     <a href="income.html" class="bt-btn bt-btn--gold">+ Log Income</a>
@@ -599,6 +614,7 @@
     renderCurrencyBreakdown(store);
 
     renderAdvisorCard(store);
+    renderSetupPasswordCard(store);
 
     if (!readOnly) {
       document.getElementById("s-name").value = store.profile?.full_name || "";
@@ -608,6 +624,13 @@
       renderFxRatesInputs(store);
       renderBudgetsInputs(store);
     }
+  }
+
+  function renderSetupPasswordCard(store) {
+    const card = document.getElementById("setpw-card");
+    const hasPassword = !!store.profile?.has_password;
+    const dismissed = sessionStorage.getItem("bt-setpw-dismissed") === "1";
+    card.style.display = (!readOnly && !hasPassword && !dismissed) ? "" : "none";
   }
 
   function renderAdvisorCard(store) {
@@ -670,6 +693,35 @@
       document.getElementById("toggle-goal-form").addEventListener("click", () => document.getElementById("goal-form").classList.toggle("show"));
       document.getElementById("toggle-debt-form").addEventListener("click", () => document.getElementById("debt-form").classList.toggle("show"));
       document.getElementById("toggle-bill-form").addEventListener("click", () => document.getElementById("bill-form").classList.toggle("show"));
+
+      document.getElementById("setpw-dismiss").addEventListener("click", () => {
+        sessionStorage.setItem("bt-setpw-dismissed", "1");
+        document.getElementById("setpw-card").style.display = "none";
+      });
+
+      document.getElementById("setpw-save").addEventListener("click", async () => {
+        const statusEl = document.getElementById("setpw-status");
+        const pw = document.getElementById("setpw-password").value;
+        const confirm = document.getElementById("setpw-confirm").value;
+        statusEl.textContent = ""; statusEl.className = "";
+        if (pw.length < 8) { statusEl.textContent = "Password must be at least 8 characters."; statusEl.className = "err"; return; }
+        if (pw !== confirm) { statusEl.textContent = "Passwords don't match."; statusEl.className = "err"; return; }
+        if (!navigator.onLine) { statusEl.textContent = "You need a connection to set a password."; statusEl.className = "err"; return; }
+        const saveBtn = document.getElementById("setpw-save");
+        saveBtn.disabled = true; saveBtn.textContent = "Saving…";
+        try {
+          await btSetPassword(pw);
+          btUpdateProfile(btUid, { has_password: true });
+          document.getElementById("setpw-card").style.display = "none";
+          document.getElementById("setpw-password").value = "";
+          document.getElementById("setpw-confirm").value = "";
+          toast("Password set — you can now sign in directly, any time.");
+        } catch (err) {
+          statusEl.textContent = err.message || "Couldn't set password — try again.";
+          statusEl.className = "err";
+        }
+        saveBtn.disabled = false; saveBtn.textContent = "Set password";
+      });
 
       document.getElementById("advisor-generate").addEventListener("click", async () => {
         if (!navigator.onLine) return toast("You need a connection to generate a code.");

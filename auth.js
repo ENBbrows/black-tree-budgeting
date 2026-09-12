@@ -20,7 +20,7 @@ async function btSendMagicLink(email) {
   if (error) throw error;
 }
 
-/** Admin-only alternative to the magic link: sign in with an email + password already set via btSetPassword(). */
+/** Alternative to the magic link, for any account that has set a password via btSetPassword(): sign in with email + password, as many times as needed, with no email round trip. */
 async function btSignInWithPassword(email, password) {
   const { data, error } = await btSupabase.auth.signInWithPassword({ email, password });
   if (error) throw error;
@@ -34,9 +34,9 @@ async function btSetPassword(password) {
 }
 
 async function btSignOut() {
-  try { await btSupabase.auth.signOut(); } catch (e) { /* offline sign-out still clears local session below */ }
   const session = await btSupabase.auth.getSession();
   const uid = session?.data?.session?.user?.id;
+  try { await btSupabase.auth.signOut(); } catch (e) { /* offline sign-out still clears local session below */ }
   if (uid) { localStorage.removeItem(btStoreKey(uid)); localStorage.removeItem(btQueueKey(uid)); }
 }
 
