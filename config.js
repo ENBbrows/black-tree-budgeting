@@ -42,7 +42,7 @@ const BT_CONFIG = {
   GOAL_LINK_CATEGORY: "Savings & Investments",
   DEBT_LINK_CATEGORY: "Debt Repayment",
 
-  GOAL_CATEGORIES: ["Debt Reduction", "Investing", "Education", "Emergency Fund", "Taxes", "Personal", "Other"],
+  GOAL_CATEGORIES: ["Debt Reduction", "Investing", "Education", "Emergency Fund", "Critical Illness Fund", "Burial Fund", "Taxes", "Personal", "Other"],
 
   /* Categories treated as "cost of living" — the baseline that has to keep
      running no matter what. Everything else (Personal, Education, Other)
@@ -82,6 +82,38 @@ const BT_CONFIG = {
     "Cheque": ["cheque", "check no", "check #", "chq"],
     "Mobile Payment": ["wipay", "linqpay", "paypal", "mobile pay"]
   },
+
+  /* Protection & Retirement Planner — standard coverage multiples applied
+     to a client's own income. Guidelines to open a conversation with an
+     advisor, not personalized underwriting. */
+  PROTECTION: {
+    emergencyFundMinMonths: 6,
+    criticalIllnessAnnualMultiple: 5,
+    lifeInsuranceAnnualMultiple: 10,
+    retirementSalaryReplacementPct: 0.75
+  },
+
+  /* Burial Fund — itemized final-expense line items with a typical low/high
+     range each. A client's own adjusted figure (if they've set one) always
+     wins; otherwise the midpoint of the range is used as the starting
+     estimate. Figures are in the client's own home currency, no FX
+     conversion applied — same treatment as the health-check thresholds. */
+  BURIAL_FUND_ITEMS: [
+    { key: "funeral_home", label: "Funeral home / mortuary services", low: 5000, high: 15000 },
+    { key: "casket", label: "Casket or urn", low: 2000, high: 20000 },
+    { key: "embalming", label: "Embalming / preparation", low: 1000, high: 3500 },
+    { key: "plot", label: "Burial plot or cremation fees", low: 2000, high: 15000 },
+    { key: "headstone", label: "Headstone / marker", low: 1500, high: 8000 },
+    { key: "transport", label: "Transportation (hearse, family cars)", low: 800, high: 3000 },
+    { key: "obituary", label: "Obituary & announcements", low: 200, high: 1500 },
+    { key: "flowers", label: "Flowers & decor", low: 500, high: 2500 },
+    { key: "repast", label: "Repast / catering for family & guests", low: 1000, high: 6000 },
+    { key: "officiant", label: "Officiant / clergy fees", low: 200, high: 1200 },
+    { key: "admin", label: "Death certificates & admin fees", low: 100, high: 800 },
+    { key: "medical", label: "Outstanding medical/hospital bills", low: 0, high: 10000 },
+    { key: "travel", label: "Travel for out-of-town family", low: 0, high: 5000 },
+    { key: "legal", label: "Legal / estate settlement fees", low: 500, high: 5000 }
+  ],
 
   /* Health-check thresholds — pulled directly from the Blacktree Financial
      Services 12-Month Tracking Tool's own guideline sheets, just applied

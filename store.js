@@ -614,3 +614,75 @@ function btHealthFlags(store, summary, today = new Date()) {
 
   return flags;
 }
+
+/* ── Protection & Retirement Planner — standard coverage multiples
+   applied to a client's own income (BT_CONFIG.PROTECTION). These are
+   guideline figures to open a conversation with an advisor, never a
+   substitute for one. ── */
+
+/** Emergency fund target: months of income (client-set, floor enforced) × estimated monthly income. */
+function btEmergencyFundTarget(store, viewCurrency, months, today = new Date()) {
+  const min = (typeof BT_CONFIG !== "undefined" && BT_CONFIG.PROTECTION?.emergencyFundMinMonths) || 6;
+  const monthlyIncome = btEstimateAnnualIncome(store, viewCurrency, today) / 12;
+  const m = Math.max(min, Math.round(Number(months) || min));
+  return { monthlyIncome, months: m, target: monthlyIncome * m };
+}
+
+/** Critical illness fund — a step up from the emergency fund: BT_CONFIG.PROTECTION.criticalIllnessAnnualMultiple × annual income. */
+function btCriticalIllnessFundTarget(store, viewCurrency, today = new Date()) {
+  const multiple = (typeof BT_CONFIG !== "undefined" && BT_CONFIG.PROTECTION?.criticalIllnessAnnualMultiple) || 5;
+  const annualIncome = btEstimateAnnualIncome(store, viewCurrency, today);
+  return { annualIncome, multiple, target: annualIncome * multiple };
+}
+
+/** Life insurance coverage guideline — BT_CONFIG.PROTECTION.lifeInsuranceAnnualMultiple × annual income. */
+function btLifeInsuranceTarget(store, viewCurrency, today = new Date()) {
+  const multiple = (typeof BT_CONFIG !== "undefined" && BT_CONFIG.PROTECTION?.lifeInsuranceAnnualMultiple) || 10;
+  const annualIncome = btEstimateAnnualIncome(store, viewCurrency, today);
+  return { annualIncome, multiple, target: annualIncome * multiple };
+}
+
+/**
+ * Most recent income entry that looks like a salary (source containing
+ * "salary"), falling back to the single most recent income entry of any
+ * kind so there's always a best-effort basis. Returns null with nothing
+ * logged at all.
+ */
+function btFindSalaryIncomeEntry(store) {
+  if (!store.income.length) return null;
+  const sorted = [...store.income].sort((a, b) => (b.entry_date + b.created_at).localeCompare(a.entry_date + a.created_at));
+  const salaryEntries = sorted.filter((e) => (e.source || "").toLowerCase().includes("salary"));
+  return salaryEntries[0] || sorted[0];
+}
+
+/** Retirement monthly payout target — BT_CONFIG.PROTECTION.retirementSalaryReplacementPct of the most recent salary, normalized to a monthly figure regardless of how it was logged (weekly, bi-weekly, etc). */
+function btRetirementMonthlyTarget(store, viewCurrency, profile) {
+  const entry = btFindSalaryIncomeEntry(store);
+  if (!entry) return null;
+  const pct = (typeof BT_CONFIG !== "undefined" && BT_CONFIG.PROTECTION?.retirementSalaryReplacementPct) || 0.75;
+  const monthlyFactor = BT_FREQ_TO_MONTHLY[entry.frequency] ?? 1;
+  const home = profile?.currency || "TTD";
+  const { value: monthlySalary } = btConvertAmount(Number(entry.amount) * monthlyFactor, entry.currency || home, viewCurrency, profile);
+  return {
+    entry, monthlySalary, pct, target: monthlySalary * pct,
+    isExplicitSalary: (entry.source || "").toLowerCase().includes("salary")
+  };
+}
+
+/** Typical low/high cost range across every Burial Fund line item — the ballpark shown before any per-item adjustment. */
+function btBurialFundRange() {
+  const items = (typeof BT_CONFIG !== "undefined" && BT_CONFIG.BURIAL_FUND_ITEMS) || [];
+  return items.reduce((acc, it) => ({ low: acc.low + it.low, high: acc.high + it.high }), { low: 0, high: 0 });
+}
+
+/** Per-item Burial Fund estimate: the client's own saved figure if they've adjusted it, else the midpoint of that item's typical range. */
+function btBurialFundItemValues(profile) {
+  const items = (typeof BT_CONFIG !== "undefined" && BT_CONFIG.BURIAL_FUND_ITEMS) || [];
+  const overrides = profile?.burial_fund_estimates || {};
+  return items.map((it) => ({ ...it, value: overrides[it.key] ?? Math.round((it.low + it.high) / 2) }));
+}
+
+/** Burial Fund total — sum of the current per-item estimates (saved overrides or defaults). */
+function btBurialFundTotal(profile) {
+  return btBurialFundItemValues(profile).reduce((s, it) => s + Number(it.value || 0), 0);
+}

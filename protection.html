@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Protection Planner — Black Tree</title>
+<link rel="apple-touch-icon" href="assets/icon-180.png">
+<link rel="icon" href="assets/icon-32.png">
+<meta name="theme-color" content="#FAF7F2">
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="theme.css" />
+<style>
+  .prot-basis { font-size: 0.82rem; color: var(--bt-muted); margin: 0 0 14px; }
+  .prot-target { font-family: var(--bt-font-head); font-size: 1.7rem; font-weight: 700; margin: 4px 0 12px; }
+  .prot-note { font-size: 0.82rem; color: var(--bt-muted); margin: 12px 0 0; line-height: 1.5; }
+  .prot-field-row { display: flex; align-items: flex-end; gap: 12px; margin-bottom: 14px; }
+  .prot-field-row input { max-width: 100px; }
+  .prot-section-head { margin: 30px 0 4px; }
+  .prot-section-head:first-of-type { margin-top: 6px; }
+  .bf-range { font-size: 0.86rem; color: var(--bt-muted); margin: 0 0 16px; }
+  .bf-item { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 10px 0; border-bottom: 1px solid var(--bt-border); }
+  .bf-item:last-of-type { border-bottom: none; }
+  .bf-item-label { font-size: 0.9rem; }
+  .bf-item-hint { font-size: 0.74rem; color: var(--bt-muted); margin-top: 2px; }
+  .bf-item input { width: 110px; flex: none; text-align: right; }
+  .bf-total { display: flex; justify-content: space-between; align-items: baseline; padding-top: 14px; margin-top: 6px; border-top: 2px solid var(--bt-ink); }
+  .bf-total .amt { font-family: var(--bt-font-head); font-size: 1.3rem; font-weight: 700; }
+</style>
+</head>
+<body>
+<div class="bt-header"><img src="assets/emblem-gold.png" alt="" style="height:32px"><img src="assets/wordmark-gold.png" alt="Black Tree Investments" style="height:28px"></div>
+
+<div class="bt-container bt-container--wide">
+  <h1>Protection &amp; Retirement Planner</h1>
+  <p class="bt-sub">Guideline coverage targets based on your own income — a starting point for the conversation with your advisor, not a substitute for one.</p>
+
+  <h2 class="prot-section-head">Blackout Period</h2>
+  <p class="bt-sub">The stretch where income stops but bills don't — covered first by your Emergency Fund, and for a serious illness, by your Critical Illness Fund.</p>
+
+  <div class="bt-card">
+    <h2 data-tip="How much set aside, in cash you can get to quickly, would cover your bills if income stopped. Black Tree's guideline minimum is 6 months — you can plan for more, never less.">Emergency Fund</h2>
+    <p class="prot-basis" id="ef-basis">—</p>
+    <div class="prot-field-row">
+      <div>
+        <label for="ef-months" style="margin:0 0 4px;display:block;font-size:0.82rem">Months to cover (minimum 6)</label>
+        <input id="ef-months" type="number" min="6" step="1" />
+      </div>
+      <button class="bt-btn bt-btn--gold bt-btn--sm" id="ef-save">Update</button>
+    </div>
+    <div class="prot-target" id="ef-target">—</div>
+    <div id="ef-goal-progress"></div>
+  </div>
+
+  <div class="bt-card">
+    <h2 data-tip="A step up from the Emergency Fund — coverage for a serious illness that could stop you from earning for an extended period. Guideline is 5× your estimated annual income.">Critical Illness Fund</h2>
+    <p class="bt-sub" style="margin-bottom:10px">A sub-category of your Emergency Fund, sized for a serious illness rather than a short income gap.</p>
+    <p class="prot-basis" id="ci-basis">—</p>
+    <div class="prot-target" id="ci-target">—</div>
+    <div id="ci-goal-progress"></div>
+  </div>
+
+  <div class="bt-card">
+    <h2 data-tip="How much life insurance coverage to hold so dependents are provided for. Guideline is 10× your estimated annual income.">Life Insurance Coverage</h2>
+    <p class="prot-basis" id="li-basis">—</p>
+    <div class="prot-target" id="li-target">—</div>
+    <p class="prot-note">Talk to your advisor about a policy that reaches this coverage level.</p>
+  </div>
+
+  <h2 class="prot-section-head">Survival Period</h2>
+  <p class="bt-sub">What carries your family through — a monthly income target once a retirement plan is activated, and a fund set aside for final expenses.</p>
+
+  <div class="bt-card">
+    <h2 data-tip="The monthly payout a retirement plan should be structured to provide, based on replacing 75% of your most recent salary.">Retirement Income Target</h2>
+    <p class="prot-basis" id="rt-basis">—</p>
+    <div class="prot-target" id="rt-target">—</div>
+    <p class="prot-note" id="rt-note"></p>
+  </div>
+
+  <div class="bt-card">
+    <h2 data-tip="Final-expense costs a family faces to organize and pay for a full passing — every line here is your own estimate, adjustable to your situation.">Burial Fund</h2>
+    <p class="bf-range" id="bf-range">—</p>
+    <div id="bf-items"></div>
+    <div class="bf-total">
+      <span>Your estimated total</span>
+      <span class="amt" id="bf-total">—</span>
+    </div>
+    <div id="bf-goal-progress"></div>
+    <button class="bt-btn bt-btn--gold bt-btn--sm" id="bf-save" style="margin-top:16px">Save breakdown</button>
+  </div>
+
+  <p class="bt-sub" style="text-align:center;margin-top:24px"><a href="dashboard.html">← Back to Dashboard</a></p>
+</div>
+
+<div class="bt-toast" id="bt-toast"></div>
+
+<nav class="bt-bottom-nav">
+  <a href="income.html">Income</a>
+  <a href="expense.html">Expense</a>
+  <a href="dashboard.html">Dashboard</a>
+</nav>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="config.js"></script>
+<script src="auth.js"></script>
+<script src="store.js"></script>
+<script src="tips.js"></script>
+<script>
+  let btUid = null;
+
+  function toast(msg) {
+    const el = document.getElementById("bt-toast");
+    el.textContent = msg;
+    el.classList.add("show");
+    clearTimeout(toast._t);
+    toast._t = setTimeout(() => el.classList.remove("show"), 2600);
+  }
+
+  function fmtMoney(n, currency) {
+    return currency + " " + Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+  }
+
+  function goalProgressHtml(store, category, target, currency) {
+    const linked = btGoalProgress(store).filter((g) => g.category === category);
+    if (!linked.length) return "";
+    const saved = linked.reduce((s, g) => s + g.saved_amount, 0);
+    const pct = target > 0 ? Math.min(1, saved / target) : 0;
+    return `
+      <div class="bt-progress"><div style="width:${pct * 100}%"></div></div>
+      <div class="meta" style="font-size:0.78rem;color:var(--bt-muted);margin-top:6px">${fmtMoney(saved, currency)} saved toward this via your "${category}" goal${linked.length > 1 ? "s" : ""} — ${Math.round(pct * 100)}%</div>
+    `;
+  }
+
+  function renderBurialFund(profile, currency) {
+    const range = btBurialFundRange();
+    document.getElementById("bf-range").textContent = `Typical range: ${fmtMoney(range.low, currency)} – ${fmtMoney(range.high, currency)}`;
+
+    const items = btBurialFundItemValues(profile);
+    document.getElementById("bf-items").innerHTML = items.map((it) => `
+      <div class="bf-item">
+        <div>
+          <div class="bf-item-label">${it.label}</div>
+          <div class="bf-item-hint">typically ${fmtMoney(it.low, currency)} – ${fmtMoney(it.high, currency)}</div>
+        </div>
+        <input type="number" min="0" step="1" class="bf-item-input" data-key="${it.key}" value="${it.value}" />
+      </div>
+    `).join("");
+
+    const updateTotal = () => {
+      let total = 0;
+      document.querySelectorAll(".bf-item-input").forEach((el) => { total += parseFloat(el.value) || 0; });
+      document.getElementById("bf-total").textContent = fmtMoney(total, currency);
+      return total;
+    };
+    document.querySelectorAll(".bf-item-input").forEach((el) => el.addEventListener("input", updateTotal));
+    const total = updateTotal();
+    document.getElementById("bf-goal-progress").innerHTML = goalProgressHtml(btLoadStore(btUid), "Burial Fund", total, currency);
+  }
+
+  function renderAll(store) {
+    const profile = store.profile;
+    const currency = profile?.currency || "TTD";
+
+    const ef = btEmergencyFundTarget(store, currency, profile?.emergency_fund_months);
+    document.getElementById("ef-months").value = ef.months;
+    document.getElementById("ef-basis").textContent = `Based on an estimated monthly income of ${fmtMoney(ef.monthlyIncome, currency)}.`;
+    document.getElementById("ef-target").textContent = `${fmtMoney(ef.target, currency)} target`;
+    document.getElementById("ef-goal-progress").innerHTML = goalProgressHtml(store, "Emergency Fund", ef.target, currency);
+
+    const ci = btCriticalIllnessFundTarget(store, currency);
+    document.getElementById("ci-basis").textContent = `${ci.multiple}× your estimated annual income of ${fmtMoney(ci.annualIncome, currency)}.`;
+    document.getElementById("ci-target").textContent = `${fmtMoney(ci.target, currency)} target`;
+    document.getElementById("ci-goal-progress").innerHTML = goalProgressHtml(store, "Critical Illness Fund", ci.target, currency);
+
+    const li = btLifeInsuranceTarget(store, currency);
+    document.getElementById("li-basis").textContent = `${li.multiple}× your estimated annual income of ${fmtMoney(li.annualIncome, currency)}.`;
+    document.getElementById("li-target").textContent = `${fmtMoney(li.target, currency)} target coverage`;
+
+    const rt = btRetirementMonthlyTarget(store, currency, profile);
+    if (!rt) {
+      document.getElementById("rt-basis").textContent = "Log some income first to see a retirement target here.";
+      document.getElementById("rt-target").textContent = "—";
+      document.getElementById("rt-note").textContent = "";
+    } else {
+      document.getElementById("rt-basis").textContent = `${Math.round(rt.pct * 100)}% of your most recent salary, ${fmtMoney(rt.monthlySalary, currency)}/month.`;
+      document.getElementById("rt-target").textContent = `${fmtMoney(rt.target, currency)}/month target payout`;
+      document.getElementById("rt-note").textContent = rt.isExplicitSalary
+        ? `Based on "${rt.entry.source}" logged ${rt.entry.entry_date}.`
+        : `No income source labeled "Salary" was found — using your most recent income entry, "${rt.entry.source}" (${rt.entry.entry_date}), as a stand-in. Log income with "Salary" in the source for a more precise figure.`;
+    }
+
+    renderBurialFund(profile, currency);
+  }
+
+  async function init() {
+    const user = await btRequireAuth();
+    if (!user) return;
+    btUid = window.btCurrentUserId = user.id;
+
+    let store = btLoadStore(btUid);
+    renderAll(store);
+    btSync(btUid).then(() => { store = btLoadStore(btUid); renderAll(store); });
+
+    document.getElementById("ef-save").addEventListener("click", () => {
+      const min = BT_CONFIG.PROTECTION.emergencyFundMinMonths;
+      let months = Math.round(parseFloat(document.getElementById("ef-months").value));
+      if (!months || isNaN(months) || months < min) {
+        toast(`Minimum is ${min} months.`);
+        months = min;
+      }
+      document.getElementById("ef-months").value = months;
+      btUpdateProfile(btUid, { emergency_fund_months: months });
+      store = btLoadStore(btUid);
+      renderAll(store);
+      toast("Emergency fund target updated");
+    });
+
+    document.getElementById("bf-save").addEventListener("click", () => {
+      const estimates = {};
+      document.querySelectorAll(".bf-item-input").forEach((el) => {
+        estimates[el.dataset.key] = Math.max(0, parseFloat(el.value) || 0);
+      });
+      btUpdateProfile(btUid, { burial_fund_estimates: estimates });
+      store = btLoadStore(btUid);
+      renderAll(store);
+      toast("Burial fund breakdown saved");
+    });
+
+    if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
+  }
+  init();
+</script>
+</body>
+</html>
