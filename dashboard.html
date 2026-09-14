@@ -196,7 +196,7 @@
 
   <div class="bt-card" id="badges-card">
     <h2>🏆 Achievements</h2>
-    <p class="bt-sub" style="margin-bottom:14px">Each badge fills in with your progress and lights up fully once it's earned — goals reached, debts settled, and staying consistent with savings week to week, month to month, and year to date.</p>
+    <p class="bt-sub" style="margin-bottom:14px">Each badge fills in with your progress and lights up fully once it's earned — one for every goal reached, one for every debt settled, and one for the Vacation Vault once it's unlocked and funded.</p>
     <div class="bt-badges-grid" id="badges-grid"></div>
   </div>
 
@@ -544,18 +544,24 @@
         status: earned ? ("Settled" + (l.target_payoff_date ? " · target " + l.target_payoff_date : "")) : fmtPct(pct) + " paid off"
       });
     });
-    const annualTarget = summary.annualSavingsTarget;
-    const savingsIn = (period) => btSumExpenseCategoryInRange(store.expenses, "Savings & Investments", period.start, period.end, viewCurrency, store.profile);
-    const today = new Date();
-    const yearFraction = Math.ceil((today - new Date(today.getFullYear(), 0, 0)) / 86400000) / 365;
-    [
-      { id: "save-week", icon: "📅", name: "Weekly Saver", target: annualTarget / 52, actual: savingsIn(summary.periods.week) },
-      { id: "save-month", icon: "🗓️", name: "Monthly Saver", target: annualTarget / 12, actual: savingsIn(summary.periods.month) },
-      { id: "save-year", icon: "🏆", name: "Yearly Saver", target: annualTarget * yearFraction, actual: summary.ytdSavingsActual }
-    ].forEach((c) => {
-      const pct = c.target > 0 ? Math.min(1, c.actual / c.target) : 0;
-      const earned = c.target > 0 && c.actual >= c.target;
-      badges.push({ id: c.id, icon: c.icon, name: c.name, pct, earned, status: c.target > 0 ? (earned ? "On track" : fmtPct(pct) + " of pace") : "Set a savings target to track this" });
+    // Vacation Vault: dormant until the client has actually unlocked it (Emergency,
+    // Critical Illness, and Burial Fund all covered) — that's the "plugged in
+    // information" gate. Once active, it tracks the same way a goal does: any
+    // goal(s) filed under the "Vacation Vault" category, saved vs target.
+    const vv = btVacationVaultUnlockProgress(store, viewCurrency, store.profile);
+    const vaultGoals = btGoalProgress(store).filter((g) => g.category === "Vacation Vault");
+    const vaultSaved = vaultGoals.reduce((s, g) => s + g.saved_amount, 0);
+    const vaultTarget = vaultGoals.reduce((s, g) => s + g.target_amount, 0);
+    const vaultEarned = vv.unlocked && vaultTarget > 0 && vaultSaved >= vaultTarget;
+    badges.push({
+      id: "vacation-vault", icon: "🌴", name: "Vacation Vault",
+      pct: vv.unlocked && vaultTarget > 0 ? Math.min(1, vaultSaved / vaultTarget) : 0,
+      earned: vaultEarned,
+      status: !vv.unlocked
+        ? "Locked — cover your Emergency, Critical Illness & Burial Funds first"
+        : vaultTarget > 0
+          ? (vaultEarned ? "Funded!" : fmtPct(vaultSaved / vaultTarget) + " there")
+          : "Active — add a Vacation Vault goal to start tracking"
     });
     return badges;
   }
