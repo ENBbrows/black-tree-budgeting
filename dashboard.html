@@ -32,6 +32,33 @@
   .bt-goal-item .row1, .bt-debt-item .row1 { display:flex; justify-content:space-between; font-size:0.92rem; margin-bottom:6px; }
   .bt-goal-item .meta, .bt-debt-item .meta { font-size:0.78rem; color:var(--bt-muted); margin-top:6px; }
   select[readonly], input[readonly] { background: var(--bt-cream); }
+
+  .bt-view-toggle { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin: 14px 0 4px; }
+  .bt-view-toggle .lbl { font-size:0.8rem; color:var(--bt-muted); }
+  .bt-view-toggle button.active { background: var(--bt-gold); color: var(--bt-ink); border-color: var(--bt-gold); }
+  .bt-top-grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 16px; margin: 4px 0 20px; }
+  .bt-top-grid .bt-card { margin-bottom: 0; }
+  .bt-donut { width: 46px; height: 46px; border-radius: 50%; flex: none; position: relative; }
+  .bt-donut::after { content:""; position:absolute; inset: 7px; border-radius:50%; background: var(--bt-white); }
+  .bt-donut-pct { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:0.6rem; font-weight:700; z-index:1; }
+  .bt-pie-wrap { display:flex; gap:18px; align-items:center; flex-wrap:wrap; }
+  .bt-pie { width: 130px; height: 130px; border-radius: 50%; flex: none; }
+  .bt-pie-legend { flex:1; min-width:160px; }
+  .bt-pie-legend .row { display:flex; justify-content:space-between; align-items:center; font-size:0.85rem; padding:5px 0; gap:8px; }
+  .bt-pie-legend .name { display:flex; align-items:center; min-width:0; }
+  .bt-pie-legend .swatch { width:10px; height:10px; border-radius:3px; display:inline-block; margin-right:8px; flex:none; }
+  .bt-list-row-plain { display:flex; justify-content:space-between; font-size:0.85rem; padding:6px 0; border-bottom:1px solid var(--bt-border); }
+  .bt-list-row-plain:last-child { border-bottom:none; }
+
+  .bt-badges-grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 14px; }
+  .bt-badge-card { text-align:center; background: var(--bt-white); border:1px solid var(--bt-border); border-radius: 14px; padding: 16px 10px; transition: box-shadow .4s, border-color .4s; }
+  .bt-badge-card.earned { box-shadow: 0 0 18px 3px rgba(194,145,51,0.5); border-color: var(--bt-gold); }
+  .bt-badge-ring { width: 62px; height: 62px; border-radius: 50%; margin: 0 auto 8px; position: relative; }
+  .bt-badge-ring::after { content:""; position:absolute; inset: 6px; border-radius:50%; background: var(--bt-white); }
+  .bt-badge-ring .icon-inner { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:1.6rem; z-index:1; }
+  .bt-badge-card .name { font-size: 0.82rem; font-weight:600; margin-bottom:4px; }
+  .bt-badge-card .status { font-size: 0.72rem; color: var(--bt-muted); }
+  .bt-badge-card.earned .status { color: var(--bt-green); font-weight:600; }
 </style>
 </head>
 <body>
@@ -58,6 +85,13 @@
       <label for="view-currency" data-tip="Converts the totals below into this currency using the exchange rates you set in Settings. Doesn't change how anything is stored — just how it's displayed." style="margin:0 0 4px">Viewing totals in</label>
       <select id="view-currency" style="width:auto"></select>
     </div>
+  </div>
+
+  <div class="bt-view-toggle" id="view-toggle">
+    <span class="lbl">Display style:</span>
+    <button class="bt-btn bt-btn--ghost bt-btn--sm" data-mode="bars" type="button">▬ Bars</button>
+    <button class="bt-btn bt-btn--ghost bt-btn--sm" data-mode="pie" type="button">◔ Pie</button>
+    <button class="bt-btn bt-btn--ghost bt-btn--sm" data-mode="list" type="button">☰ List</button>
   </div>
 
   <div id="bt-onboard" style="display:none"></div>
@@ -95,19 +129,82 @@
     <a class="bt-btn bt-btn--gold" id="invest-cta-btn" href="#" target="_blank" rel="noopener">Talk to Your Advisor</a>
   </div>
 
+  <div class="bt-top-grid">
+    <div class="bt-card">
+      <h2>Year to Date</h2>
+      <div class="bt-stat-grid" id="stats-ytd"></div>
+    </div>
+    <div class="bt-card">
+      <h2>This Week</h2>
+      <div class="bt-stat-grid" id="stats-week" style="grid-template-columns:1fr"></div>
+    </div>
+    <div class="bt-card" id="vv-unlock-card">
+      <h2>🌴 Vacation Vault Unlock</h2>
+      <p class="bt-sub" id="vv-unlock-sub" style="margin-bottom:10px">—</p>
+      <div id="vv-unlock-graphic"></div>
+      <div style="display:flex;justify-content:space-between;font-size:0.8rem;color:var(--bt-muted);margin-top:6px">
+        <span id="vv-unlock-actual"></span><span id="vv-unlock-target"></span>
+      </div>
+    </div>
+  </div>
+
+  <div class="bt-top-grid" style="grid-template-columns: repeat(auto-fit, minmax(320px, 1fr))">
+    <div class="bt-card" id="goals-card">
+      <div class="bt-section-head" style="margin:0 0 6px">
+        <h2>Goals</h2>
+        <button class="bt-btn bt-btn--ghost bt-btn--sm" id="toggle-goal-form">+ Add goal</button>
+      </div>
+      <div id="goals-list"><div class="bt-empty">No goals yet.</div></div>
+      <div class="bt-mini-form" id="goal-form">
+        <label data-tip="A short name for what you're saving toward, e.g. &quot;Vacation Fund&quot;.">Description</label>
+        <input id="g-desc" type="text" placeholder="e.g. Vacation Fund" />
+        <label data-tip="Roughly what kind of goal this is.">Category</label>
+        <select id="g-category"></select>
+        <div class="bt-field-row">
+          <div><label data-tip="The total you're aiming to save.">Target amount</label><input id="g-target" type="number" min="0" step="0.01" /></div>
+          <div><label data-tip="If you'd already put money aside for this before using the tracker, enter it here as a starting point.">Already saved</label><input id="g-opening" type="number" min="0" step="0.01" value="0" /></div>
+        </div>
+        <label data-tip="Optional — when you'd like to reach this goal by.">Target date <span style="font-weight:400;color:var(--bt-muted)">(optional)</span></label>
+        <input id="g-date" type="date" />
+        <button class="bt-btn bt-btn--gold" id="g-submit" style="margin-top:14px">Save goal</button>
+      </div>
+    </div>
+
+    <div class="bt-card" id="debts-card">
+      <div class="bt-section-head" style="margin:0 0 6px">
+        <h2>Debt Tracker</h2>
+        <button class="bt-btn bt-btn--ghost bt-btn--sm" id="toggle-debt-form">+ Add debt</button>
+      </div>
+      <div id="debts-list"><div class="bt-empty">No debts tracked.</div></div>
+      <div class="bt-mini-form" id="debt-form">
+        <label data-tip="e.g. &quot;Car Loan&quot; or &quot;Credit Card&quot;.">Debt name</label>
+        <input id="d-name" type="text" placeholder="e.g. Car Loan" />
+        <label data-tip="Optional — who you owe.">Lender <span style="font-weight:400;color:var(--bt-muted)">(optional)</span></label>
+        <input id="d-lender" type="text" />
+        <div class="bt-field-row">
+          <div><label data-tip="What you currently owe, as of your latest statement.">Current balance owed</label><input id="d-balance" type="number" min="0" step="0.01" /></div>
+          <div><label data-tip="Optional — the annual interest rate, if you know it.">Interest rate % <span style="font-weight:400">(optional)</span></label><input id="d-rate" type="number" min="0" step="0.01" /></div>
+        </div>
+        <label data-tip="Optional — your minimum required payment.">Minimum payment <span style="font-weight:400;color:var(--bt-muted)">(optional)</span></label>
+        <input id="d-min" type="number" min="0" step="0.01" />
+        <label data-tip="Optional — when you'd like this debt fully paid off. We'll show whether your payments are keeping pace.">Target payoff date <span style="font-weight:400;color:var(--bt-muted)">(optional)</span></label>
+        <input id="d-date" type="date" />
+        <button class="bt-btn bt-btn--gold" id="d-submit" style="margin-top:14px">Save debt</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="bt-card" id="badges-card">
+    <h2>🏆 Achievements</h2>
+    <p class="bt-sub" style="margin-bottom:14px">Each badge fills in with your progress and lights up fully once it's earned — goals reached, debts settled, and staying consistent with savings week to week, month to month, and year to date.</p>
+    <div class="bt-badges-grid" id="badges-grid"></div>
+  </div>
+
   <div class="bt-dash-grid">
     <div>
       <div class="bt-card">
-        <h2>This Week</h2>
-        <div class="bt-stat-grid" id="stats-week"></div>
-      </div>
-      <div class="bt-card">
         <h2>This Month</h2>
         <div class="bt-stat-grid" id="stats-month"></div>
-      </div>
-      <div class="bt-card">
-        <h2>Year to Date</h2>
-        <div class="bt-stat-grid" id="stats-ytd"></div>
       </div>
 
       <div class="bt-card" id="bills-card">
@@ -156,7 +253,7 @@
       <div class="bt-card">
         <h2><span class="bt-status-dot" id="savings-dot"></span>Savings Target</h2>
         <p class="bt-sub" id="savings-sub" style="margin-bottom:10px">—</p>
-        <div class="bt-progress"><div id="savings-bar" style="width:0%"></div></div>
+        <div id="savings-graphic"></div>
         <div style="display:flex;justify-content:space-between;font-size:0.8rem;color:var(--bt-muted);margin-top:6px">
           <span id="savings-actual"></span><span id="savings-target"></span>
         </div>
@@ -166,50 +263,6 @@
         <h2 data-tip="Cost of Living = your essential spending (Housing, Utilities, Transport, Food, Insurance, Debt Repayment) this month. Disposable Income = what's left after essentials AND after this month's savings contributions — money genuinely free to invest further or add to a goal.">Cost of Living & Disposable Income</h2>
         <div class="bt-stat-grid" id="col-stats" style="grid-template-columns:1fr 1fr"></div>
         <p class="bt-sub" id="col-note" style="margin:10px 0 0"></p>
-      </div>
-
-      <div class="bt-card" id="goals-card">
-        <div class="bt-section-head" style="margin:0 0 6px">
-          <h2>Goals</h2>
-          <button class="bt-btn bt-btn--ghost bt-btn--sm" id="toggle-goal-form">+ Add goal</button>
-        </div>
-        <div id="goals-list"><div class="bt-empty">No goals yet.</div></div>
-        <div class="bt-mini-form" id="goal-form">
-          <label data-tip="A short name for what you're saving toward, e.g. &quot;Vacation Fund&quot;.">Description</label>
-          <input id="g-desc" type="text" placeholder="e.g. Vacation Fund" />
-          <label data-tip="Roughly what kind of goal this is.">Category</label>
-          <select id="g-category"></select>
-          <div class="bt-field-row">
-            <div><label data-tip="The total you're aiming to save.">Target amount</label><input id="g-target" type="number" min="0" step="0.01" /></div>
-            <div><label data-tip="If you'd already put money aside for this before using the tracker, enter it here as a starting point.">Already saved</label><input id="g-opening" type="number" min="0" step="0.01" value="0" /></div>
-          </div>
-          <label data-tip="Optional — when you'd like to reach this goal by.">Target date <span style="font-weight:400;color:var(--bt-muted)">(optional)</span></label>
-          <input id="g-date" type="date" />
-          <button class="bt-btn bt-btn--gold" id="g-submit" style="margin-top:14px">Save goal</button>
-        </div>
-      </div>
-
-      <div class="bt-card" id="debts-card">
-        <div class="bt-section-head" style="margin:0 0 6px">
-          <h2>Debt Tracker</h2>
-          <button class="bt-btn bt-btn--ghost bt-btn--sm" id="toggle-debt-form">+ Add debt</button>
-        </div>
-        <div id="debts-list"><div class="bt-empty">No debts tracked.</div></div>
-        <div class="bt-mini-form" id="debt-form">
-          <label data-tip="e.g. &quot;Car Loan&quot; or &quot;Credit Card&quot;.">Debt name</label>
-          <input id="d-name" type="text" placeholder="e.g. Car Loan" />
-          <label data-tip="Optional — who you owe.">Lender <span style="font-weight:400;color:var(--bt-muted)">(optional)</span></label>
-          <input id="d-lender" type="text" />
-          <div class="bt-field-row">
-            <div><label data-tip="What you currently owe, as of your latest statement.">Current balance owed</label><input id="d-balance" type="number" min="0" step="0.01" /></div>
-            <div><label data-tip="Optional — the annual interest rate, if you know it.">Interest rate % <span style="font-weight:400">(optional)</span></label><input id="d-rate" type="number" min="0" step="0.01" /></div>
-          </div>
-          <label data-tip="Optional — your minimum required payment.">Minimum payment <span style="font-weight:400;color:var(--bt-muted)">(optional)</span></label>
-          <input id="d-min" type="number" min="0" step="0.01" />
-          <label data-tip="Optional — when you'd like this debt fully paid off. We'll show whether your payments are keeping pace.">Target payoff date <span style="font-weight:400;color:var(--bt-muted)">(optional)</span></label>
-          <input id="d-date" type="date" />
-          <button class="bt-btn bt-btn--gold" id="d-submit" style="margin-top:14px">Save debt</button>
-        </div>
       </div>
 
       <div class="bt-card" id="advisor-card" style="display:none">
@@ -298,6 +351,64 @@
   function fmtHome(n) { return homeCurrency() + " " + Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 }); }
   function fmtPct(n) { return Math.round(n * 100) + "%"; }
 
+  /* ── Display mode (Bars / Pie / List) + a small categorical palette for
+     pie charts. Colors are the validated default set from the dataviz
+     skill's reference palette (8 hues, fixed order, CVD-checked) — reused
+     as-is rather than hand-picked, since Black Tree's brand only defines
+     ink/gold/status colors, not a categorical set of its own. Any key past
+     slot 8 (an 11th expense category, say) falls to muted gray rather than
+     cycling colors, per that palette's own rule. ── */
+  const BT_PALETTE = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300", "#4a3aa7", "#e34948"];
+  const BT_MUTED = "#898781";
+  let btViewMode = (function () { try { return localStorage.getItem("bt_view_mode") || "bars"; } catch (e) { return "bars"; } })();
+
+  function paletteColor(orderArr, key) {
+    const idx = orderArr.indexOf(key);
+    return (idx >= 0 && idx < BT_PALETTE.length) ? BT_PALETTE[idx] : BT_MUTED;
+  }
+  function categoryColor(cat) { return paletteColor(BT_CONFIG.EXPENSE_CATEGORIES, cat); }
+  function paymentColor(method) { return paletteColor(BT_CONFIG.PAYMENT_TYPES, method); }
+  function currencyColor(cur, home) { return paletteColor([home, ...(BT_CONFIG.EXTRA_CURRENCIES || []).filter((c) => c !== home)], cur); }
+
+  /** A single value's progress indicator, shaped by the current display mode: a bar, a small donut, or nothing (list mode shows the numbers alone). */
+  function progressGraphic(pct, color) {
+    const p = Math.max(0, Math.min(1, pct || 0));
+    const c = color || "var(--bt-gold)";
+    if (btViewMode === "list") return "";
+    if (btViewMode === "pie") {
+      const deg = Math.round(p * 360);
+      return `<div class="bt-donut" style="background:conic-gradient(${c} ${deg}deg, var(--bt-border) ${deg}deg)"><span class="bt-donut-pct">${Math.round(p * 100)}%</span></div>`;
+    }
+    return `<div class="bt-progress"><div style="width:${p * 100}%;background:${c}"></div></div>`;
+  }
+
+  /** A proportional breakdown (parts of a whole) as a CSS conic-gradient pie + legend. segments: [{label, amount, color, note}]. */
+  function renderPieChart(wrap, segments) {
+    const total = segments.reduce((s, r) => s + r.amount, 0);
+    if (!total) { wrap.innerHTML = '<div class="bt-empty">Nothing to show yet.</div>'; return; }
+    let acc = 0;
+    const stops = segments.map((r) => {
+      const start = (acc / total) * 100;
+      acc += r.amount;
+      const end = (acc / total) * 100;
+      return `${r.color} ${start}% ${end}%`;
+    }).join(", ");
+    wrap.innerHTML = `
+      <div class="bt-pie-wrap">
+        <div class="bt-pie" style="background:conic-gradient(${stops})"></div>
+        <div class="bt-pie-legend">
+          ${segments.map((r) => `<div class="row"><span class="name"><span class="swatch" style="background:${r.color}"></span>${btEscapeHtml(r.label)}</span><span>${r.note}</span></div>`).join("")}
+        </div>
+      </div>`;
+  }
+
+  function setViewMode(mode) {
+    btViewMode = mode;
+    try { localStorage.setItem("bt_view_mode", mode); } catch (e) {}
+    document.querySelectorAll("#view-toggle button").forEach((b) => b.classList.toggle("active", b.dataset.mode === mode));
+    renderAll();
+  }
+
   function renderFlags(flags) {
     const wrap = document.getElementById("bt-flags");
     if (!flags.length) { wrap.innerHTML = ""; return; }
@@ -328,10 +439,16 @@
     `;
   }
 
+  function renderWeekSpend(period) {
+    document.getElementById("stats-week").innerHTML = `
+      <div class="bt-stat"><div class="bt-stat-label">Weekly Spend</div><div class="bt-stat-value">${fmtMoney(period.expenses)}</div></div>
+    `;
+  }
+
   function renderSavings(summary, today = new Date()) {
     document.getElementById("savings-sub").textContent = `Target ${fmtPct(summary.targetPct)} of an estimated ${fmtMoney(summary.annualIncomeEstimate)} annual income.`;
     const pct = summary.annualSavingsTarget > 0 ? Math.min(1, summary.ytdSavingsActual / summary.annualSavingsTarget) : 0;
-    document.getElementById("savings-bar").style.width = (pct * 100) + "%";
+    document.getElementById("savings-graphic").innerHTML = progressGraphic(pct);
     document.getElementById("savings-actual").textContent = fmtMoney(summary.ytdSavingsActual) + " saved YTD";
     document.getElementById("savings-target").textContent = "Target " + fmtMoney(summary.annualSavingsTarget) + "/yr";
 
@@ -345,6 +462,135 @@
     else dot.className = "bt-status-dot bt-status-dot--red";
   }
 
+  function renderVacationVaultUnlock(store) {
+    const prog = btVacationVaultUnlockProgress(store, viewCurrency, store.profile);
+    const sub = document.getElementById("vv-unlock-sub");
+    if (prog.unlocked) {
+      sub.textContent = "🎉 Unlocked! Every base is covered — head to the Vacation Vault to set aside extra income.";
+      document.getElementById("vv-unlock-graphic").innerHTML = progressGraphic(1, "var(--bt-green)");
+    } else {
+      sub.textContent = "Fully fund your Emergency Fund, Critical Illness Fund, and Burial Fund to unlock this reward.";
+      document.getElementById("vv-unlock-graphic").innerHTML = progressGraphic(prog.pct);
+    }
+    document.getElementById("vv-unlock-actual").textContent = fmtMoney(prog.totalSaved) + " saved";
+    document.getElementById("vv-unlock-target").textContent = "Target " + fmtMoney(prog.totalTarget);
+  }
+
+  /* ── Achievements: a badge per goal, per debt, and per savings-consistency
+     period (week/month/year). Each badge's ring fills in gold proportional
+     to its own progress — grey is what's left, gold is what's done — and
+     the whole card gets a soft glow once it hits 100%. A short confetti
+     burst + chime fire the first time a badge crosses into "earned" on
+     this device, tracked via localStorage so it never re-fires on a plain
+     reload, and never fires in a flood the first time this feature loads
+     on a device that already had goals completed beforehand. ── */
+  function fireConfetti() {
+    const canvas = document.createElement("canvas");
+    canvas.style.cssText = "position:fixed;inset:0;pointer-events:none;z-index:9999";
+    canvas.width = window.innerWidth; canvas.height = window.innerHeight;
+    document.body.appendChild(canvas);
+    const ctx = canvas.getContext("2d");
+    const colors = ["#C29133", "#E3B85C", "#3F7A4E", "#221E1F", "#B3413A"];
+    const pieces = Array.from({ length: 90 }, () => ({
+      x: Math.random() * canvas.width, y: -20 - Math.random() * canvas.height * 0.3,
+      vx: (Math.random() - 0.5) * 3, vy: 2 + Math.random() * 3,
+      size: 5 + Math.random() * 5, color: colors[Math.floor(Math.random() * colors.length)],
+      rot: Math.random() * Math.PI, vr: (Math.random() - 0.5) * 0.3
+    }));
+    let frame = 0;
+    (function tick() {
+      frame++;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      pieces.forEach((p) => {
+        p.x += p.vx; p.y += p.vy; p.vy += 0.04; p.rot += p.vr;
+        ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot);
+        ctx.fillStyle = p.color; ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size * 0.6);
+        ctx.restore();
+      });
+      if (frame < 110) requestAnimationFrame(tick); else canvas.remove();
+    })();
+  }
+
+  function playChime() {
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      const ctx = new AC();
+      [660, 880, 1100].forEach((freq, i) => {
+        const osc = ctx.createOscillator(); const gain = ctx.createGain();
+        osc.type = "sine"; osc.frequency.value = freq;
+        osc.connect(gain); gain.connect(ctx.destination);
+        const start = ctx.currentTime + i * 0.09;
+        gain.gain.setValueAtTime(0, start);
+        gain.gain.linearRampToValueAtTime(0.18, start + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.001, start + 0.35);
+        osc.start(start); osc.stop(start + 0.4);
+      });
+    } catch (e) { /* Web Audio unavailable — badge still glows silently */ }
+  }
+
+  function computeBadges(store, summary) {
+    const badges = [];
+    btGoalProgress(store).forEach((g) => {
+      badges.push({
+        id: "goal-" + g.id, icon: "🎯", name: g.description, pct: g.progress_pct, earned: g.progress_pct >= 1,
+        status: g.progress_pct >= 1 ? ("Completed" + (g.target_date ? " · target " + g.target_date : "")) : fmtPct(g.progress_pct) + " there"
+      });
+    });
+    btLiabilityProgress(store).forEach((l) => {
+      const pct = l.current_balance > 0 ? Math.min(1, l.paid_via_tracker / l.current_balance) : 0;
+      const earned = l.estimated_remaining <= 0;
+      badges.push({
+        id: "debt-" + l.id, icon: "🏁", name: l.debt_name, pct, earned,
+        status: earned ? ("Settled" + (l.target_payoff_date ? " · target " + l.target_payoff_date : "")) : fmtPct(pct) + " paid off"
+      });
+    });
+    const annualTarget = summary.annualSavingsTarget;
+    const savingsIn = (period) => btSumExpenseCategoryInRange(store.expenses, "Savings & Investments", period.start, period.end, viewCurrency, store.profile);
+    const today = new Date();
+    const yearFraction = Math.ceil((today - new Date(today.getFullYear(), 0, 0)) / 86400000) / 365;
+    [
+      { id: "save-week", icon: "📅", name: "Weekly Saver", target: annualTarget / 52, actual: savingsIn(summary.periods.week) },
+      { id: "save-month", icon: "🗓️", name: "Monthly Saver", target: annualTarget / 12, actual: savingsIn(summary.periods.month) },
+      { id: "save-year", icon: "🏆", name: "Yearly Saver", target: annualTarget * yearFraction, actual: summary.ytdSavingsActual }
+    ].forEach((c) => {
+      const pct = c.target > 0 ? Math.min(1, c.actual / c.target) : 0;
+      const earned = c.target > 0 && c.actual >= c.target;
+      badges.push({ id: c.id, icon: c.icon, name: c.name, pct, earned, status: c.target > 0 ? (earned ? "On track" : fmtPct(pct) + " of pace") : "Set a savings target to track this" });
+    });
+    return badges;
+  }
+
+  function renderBadges(store, summary) {
+    const badges = computeBadges(store, summary);
+    const wrap = document.getElementById("badges-grid");
+    if (!badges.length) { wrap.innerHTML = '<div class="bt-empty">Add a goal or debt to start earning badges.</div>'; return; }
+
+    wrap.innerHTML = badges.map((b) => {
+      const deg = Math.round(b.pct * 360);
+      return `
+      <div class="bt-badge-card ${b.earned ? "earned" : ""}">
+        <div class="bt-badge-ring" style="background:conic-gradient(var(--bt-gold) ${deg}deg, var(--bt-border) ${deg}deg)"><span class="icon-inner">${b.icon}</span></div>
+        <div class="name">${btEscapeHtml(b.name)}</div>
+        <div class="status">${btEscapeHtml(b.status)}</div>
+      </div>`;
+    }).join("");
+
+    if (readOnly) return; // no confetti/sound/localStorage writes while looking at someone else's dashboard
+    const seenKey = "bt_badges_seen_" + btUid;
+    let seen = null;
+    try { seen = JSON.parse(localStorage.getItem(seenKey)); } catch (e) {}
+    const earnedIds = badges.filter((b) => b.earned).map((b) => b.id);
+    if (seen) {
+      const newlyEarned = badges.filter((b) => b.earned && !seen.includes(b.id));
+      if (newlyEarned.length) {
+        fireConfetti();
+        playChime();
+        toast(newlyEarned.length === 1 ? `🏆 Badge earned: ${newlyEarned[0].name}!` : `🏆 ${newlyEarned.length} badges earned!`);
+      }
+    }
+    try { localStorage.setItem(seenKey, JSON.stringify(earnedIds)); } catch (e) {}
+  }
+
   function renderGoals(store) {
     const list = btGoalProgress(store);
     const wrap = document.getElementById("goals-list");
@@ -352,7 +598,7 @@
     wrap.innerHTML = list.map((g) => `
       <div class="bt-goal-item">
         <div class="row1"><strong>${btEscapeHtml(g.description)}</strong><span>${fmtHome(g.saved_amount)} / ${fmtHome(g.target_amount)}</span></div>
-        <div class="bt-progress"><div style="width:${g.progress_pct * 100}%"></div></div>
+        ${progressGraphic(g.progress_pct)}
         <div class="meta">${g.category}${g.target_date ? " · by " + g.target_date : ""} · ${fmtPct(g.progress_pct)} complete</div>
       </div>
     `).join("");
@@ -376,7 +622,7 @@
       return `
       <div class="bt-debt-item">
         <div class="row1"><span style="display:flex;align-items:center;gap:6px">${dot}<strong>${btEscapeHtml(l.debt_name)}</strong></span><span>${fmtHome(l.estimated_remaining)} left</span></div>
-        <div class="bt-progress"><div style="width:${pctPaid * 100}%"></div></div>
+        ${progressGraphic(pctPaid)}
         <div class="meta">${btEscapeHtml(l.lender) || "—"}${l.interest_rate ? " · " + l.interest_rate + "%" : ""} · ${fmtHome(l.paid_via_tracker)} paid via tracker${paceNote ? " · " + paceNote : ""}${l.needs_payment_reminder ? ` · no payment in ${l.days_since_payment}d` : ""}</div>
       </div>`;
     }).join("");
@@ -439,6 +685,25 @@
     });
     const total = Object.values(totals).reduce((a, b) => a + b, 0);
     const rows = Object.entries(totals).sort((a, b) => b[1] - a[1]);
+
+    if (btViewMode === "list") {
+      wrap.innerHTML = rows.map(([cat, amt]) => `<div class="bt-list-row-plain"><span>${cat}</span><span>${fmtMoney(amt)} · ${Math.round(amt / total * 100)}%</span></div>`).join("");
+      return;
+    }
+    if (btViewMode === "pie") {
+      // Beyond the palette's 8 identity slots, fold the rest into one "Other" wedge rather than cycling colors.
+      const folded = {};
+      rows.forEach(([cat, amt]) => {
+        const key = categoryColor(cat) === BT_MUTED ? "Other" : cat;
+        folded[key] = (folded[key] || 0) + amt;
+      });
+      const segments = Object.entries(folded).sort((a, b) => b[1] - a[1]).map(([cat, amt]) => ({
+        label: cat, amount: amt, color: cat === "Other" ? BT_MUTED : categoryColor(cat),
+        note: `${fmtMoney(amt)} · ${Math.round(amt / total * 100)}%`
+      }));
+      renderPieChart(wrap, segments);
+      return;
+    }
     wrap.innerHTML = rows.map(([cat, amt]) => {
       const rawAmt = inMonth.filter((e) => e.category === cat).reduce((s, e) => s + Number(e.amount), 0);
       const budget = budgets[cat];
@@ -461,6 +726,19 @@
     const total = Object.values(totals).reduce((a, b) => a + b, 0);
     if (!total) { wrap.innerHTML = '<div class="bt-empty">No expenses logged this month yet.</div>'; return; }
     const rows = Object.entries(totals).sort((a, b) => b[1] - a[1]);
+
+    if (btViewMode === "list") {
+      wrap.innerHTML = rows.map(([method, amt]) => `<div class="bt-list-row-plain"><span>${method}</span><span>${fmtMoney(amt)} · ${Math.round(amt / total * 100)}%</span></div>`).join("");
+      return;
+    }
+    if (btViewMode === "pie") {
+      const segments = rows.map(([method, amt]) => ({
+        label: method, amount: amt, color: paymentColor(method),
+        note: `${fmtMoney(amt)} · ${Math.round(amt / total * 100)}%`
+      }));
+      renderPieChart(wrap, segments);
+      return;
+    }
     wrap.innerHTML = rows.map(([method, amt]) => `
       <div style="margin-bottom:10px">
         <div style="display:flex;justify-content:space-between;font-size:0.85rem;margin-bottom:4px"><span>${method}</span><span>${fmtMoney(amt)} · ${Math.round(amt / total * 100)}%</span></div>
@@ -475,9 +753,30 @@
     const card = document.getElementById("currency-breakdown-card");
     if (currencies.length < 2) { card.style.display = "none"; return; }
     card.style.display = "";
-    document.getElementById("currency-breakdown-list").innerHTML = currencies.sort().map((cur) => `
-      <div class="bt-list-row"><div>${cur}</div><div class="amt">${cur} ${totals[cur].toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</div></div>
-    `).join("");
+    const home = homeCurrency();
+    const total = Object.values(totals).reduce((a, b) => a + b, 0);
+    const sorted = currencies.sort();
+    const wrap = document.getElementById("currency-breakdown-list");
+
+    if (btViewMode === "list") {
+      wrap.innerHTML = sorted.map((cur) => `
+        <div class="bt-list-row"><div>${cur}</div><div class="amt">${cur} ${totals[cur].toLocaleString(undefined, { maximumFractionDigits: 0 })}</div></div>
+      `).join("");
+      return;
+    }
+    if (btViewMode === "pie") {
+      const segments = sorted.map((cur) => ({
+        label: cur, amount: totals[cur], color: currencyColor(cur, home),
+        note: `${cur} ${totals[cur].toLocaleString(undefined, { maximumFractionDigits: 0 })}`
+      }));
+      renderPieChart(wrap, segments);
+      return;
+    }
+    wrap.innerHTML = sorted.map((cur) => `
+      <div style="margin-bottom:10px">
+        <div style="display:flex;justify-content:space-between;font-size:0.85rem;margin-bottom:4px"><span>${cur}</span><span>${cur} ${totals[cur].toLocaleString(undefined, { maximumFractionDigits: 0 })}</span></div>
+        <div class="bt-progress"><div style="width:${total > 0 ? (totals[cur] / total) * 100 : 0}%;background:${currencyColor(cur, home)}"></div></div>
+      </div>`).join("");
   }
 
   function renderCurrencySelector(store) {
@@ -600,12 +899,14 @@
     const flags = btHealthFlags(store, summary);
     renderFlags(flags);
     renderInvestCta(store, summary, flags);
-    renderStats("stats-week", summary.periods.week);
+    renderWeekSpend(summary.periods.week);
     renderStats("stats-month", summary.periods.month);
     renderStats("stats-ytd", summary.periods.ytd);
+    renderVacationVaultUnlock(store);
     renderSavings(summary);
     renderGoals(store);
     renderDebts(store);
+    renderBadges(store, summary);
     renderBills(store);
     renderCostOfLiving(store, summary);
     renderCashflowChart(store);
@@ -679,6 +980,11 @@
     }
 
     updateNetBadge();
+
+    document.querySelectorAll("#view-toggle button").forEach((b) => {
+      b.classList.toggle("active", b.dataset.mode === btViewMode);
+      b.addEventListener("click", () => setViewMode(b.dataset.mode));
+    });
 
     document.getElementById("bt-logout").addEventListener("click", async () => { await btSignOut(); window.location.replace("login.html"); });
 

@@ -728,6 +728,33 @@ function btProtectionFullyCovered(store, viewCurrency, profile) {
   return isCovered("Emergency Fund", ef.target) && isCovered("Critical Illness Fund", ci.target) && isCovered("Burial Fund", bfTarget);
 }
 
+/**
+ * Combined progress toward unlocking the Vacation Vault — Emergency Fund,
+ * Critical Illness Fund, and Burial Fund, saved vs target, added together.
+ * Each fund's contribution is capped at its own target so overfunding one
+ * can't mask another sitting empty; pct only reaches 100% exactly when
+ * btProtectionFullyCovered would also be true.
+ */
+function btVacationVaultUnlockProgress(store, viewCurrency, profile) {
+  const goals = btGoalProgress(store);
+  const savedIn = (category) => goals.filter((g) => g.category === category).reduce((s, g) => s + g.saved_amount, 0);
+  const ef = btEmergencyFundTarget(store, viewCurrency, profile?.emergency_fund_months);
+  const ci = btCriticalIllnessFundTarget(store, viewCurrency);
+  const bfTarget = btBurialFundTotal(profile);
+  const parts = [
+    { category: "Emergency Fund", saved: savedIn("Emergency Fund"), target: ef.target },
+    { category: "Critical Illness Fund", saved: savedIn("Critical Illness Fund"), target: ci.target },
+    { category: "Burial Fund", saved: savedIn("Burial Fund"), target: bfTarget }
+  ];
+  const totalSaved = parts.reduce((s, p) => s + Math.min(p.saved, p.target), 0);
+  const totalTarget = parts.reduce((s, p) => s + p.target, 0);
+  return {
+    pct: totalTarget > 0 ? Math.min(1, totalSaved / totalTarget) : 0,
+    totalSaved, totalTarget, parts,
+    unlocked: btProtectionFullyCovered(store, viewCurrency, profile)
+  };
+}
+
 /** Suggested monthly Vacation Vault contribution — a client-chosen percentage (0-100) of this month's disposable income. */
 function btVacationVaultSuggestion(disposable, pct) {
   const p = Math.max(0, Math.min(100, Number(pct) || 0));

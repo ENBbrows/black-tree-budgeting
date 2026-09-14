@@ -27,6 +27,11 @@
   .bf-item input { width: 110px; flex: none; text-align: right; }
   .bf-total { display: flex; justify-content: space-between; align-items: baseline; padding-top: 14px; margin-top: 6px; border-top: 2px solid var(--bt-ink); }
   .bf-total .amt { font-family: var(--bt-font-head); font-size: 1.3rem; font-weight: 700; }
+  .bf-toggle-head { cursor: pointer; user-select: none; justify-content: space-between; }
+  .bf-chevron { font-weight: 400; color: var(--bt-muted); transition: transform .2s; }
+  .bf-chevron.collapsed { transform: rotate(-90deg); }
+  .bf-detail { overflow: hidden; max-height: 2000px; transition: max-height .3s ease; }
+  .bf-detail.collapsed { max-height: 0; }
   .vv-locked-note { font-size: 0.86rem; color: var(--bt-muted); background: var(--bt-cream); border-radius: 10px; padding: 12px 14px; margin-bottom: 14px; }
   .vv-unlocked-note { font-size: 0.86rem; color: var(--bt-green); margin: 0 0 14px; }
   #vv-card.vv-locked .prot-field-row, #vv-card.vv-locked .prot-target { opacity: 0.45; }
@@ -83,15 +88,17 @@
   </div>
 
   <div class="bt-card">
-    <h2 data-tip="Final-expense costs a family faces to organize and pay for a full passing — every line here is your own estimate, adjustable to your situation.">Burial Fund</h2>
+    <h2 class="bf-toggle-head" id="bf-toggle" data-tip="Final-expense costs a family faces to organize and pay for a full passing — every line here is your own estimate, adjustable to your situation. Click to expand or collapse the breakdown.">Burial Fund <span class="bf-chevron" id="bf-chevron">▾</span></h2>
     <p class="bf-range" id="bf-range">—</p>
-    <div id="bf-items"></div>
     <div class="bf-total">
       <span>Your estimated total</span>
       <span class="amt" id="bf-total">—</span>
     </div>
     <div id="bf-goal-progress"></div>
-    <button class="bt-btn bt-btn--gold bt-btn--sm" id="bf-save" style="margin-top:16px">Save breakdown</button>
+    <div class="bf-detail" id="bf-detail">
+      <div id="bf-items"></div>
+      <button class="bt-btn bt-btn--gold bt-btn--sm" id="bf-save" style="margin-top:16px">Save breakdown</button>
+    </div>
   </div>
 
   <div class="bt-card" id="vv-card">
@@ -256,6 +263,11 @@
     let store = btLoadStore(btUid);
     renderAll(store);
     btSync(btUid).then(() => { store = btLoadStore(btUid); renderAll(store); });
+
+    document.getElementById("bf-toggle").addEventListener("click", () => {
+      document.getElementById("bf-detail").classList.toggle("collapsed");
+      document.getElementById("bf-chevron").classList.toggle("collapsed");
+    });
 
     document.getElementById("ef-save").addEventListener("click", () => {
       const min = BT_CONFIG.PROTECTION.emergencyFundMinMonths;
