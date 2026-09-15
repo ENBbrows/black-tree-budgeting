@@ -39,7 +39,13 @@
 </style>
 </head>
 <body>
-<div class="bt-header"><img src="assets/emblem-gold.png" alt="" style="height:32px"><img src="assets/wordmark-gold.png" alt="Black Tree Investments" style="height:28px"></div>
+<div class="bt-header bt-header--row">
+  <div class="bt-brand">
+    <img src="assets/emblem-gold.png" alt="" style="height:32px">
+    <img src="assets/wordmark-gold.png" alt="Black Tree Investments" style="height:28px">
+  </div>
+  <a href="dashboard.html" class="bt-btn bt-btn--ghost bt-btn--sm" style="text-decoration:none">← Dashboard</a>
+</div>
 
 <div class="bt-container bt-container--wide">
   <h1>Protection &amp; Retirement Planner</h1>
@@ -264,9 +270,15 @@
     renderAll(store);
     btSync(btUid).then(() => { store = btLoadStore(btUid); renderAll(store); });
 
+    const bfCollapseKey = "bt_bf_collapsed_" + btUid;
+    if (localStorage.getItem(bfCollapseKey) === "1") {
+      document.getElementById("bf-detail").classList.add("collapsed");
+      document.getElementById("bf-chevron").classList.add("collapsed");
+    }
     document.getElementById("bf-toggle").addEventListener("click", () => {
-      document.getElementById("bf-detail").classList.toggle("collapsed");
-      document.getElementById("bf-chevron").classList.toggle("collapsed");
+      const collapsed = document.getElementById("bf-detail").classList.toggle("collapsed");
+      document.getElementById("bf-chevron").classList.toggle("collapsed", collapsed);
+      localStorage.setItem(bfCollapseKey, collapsed ? "1" : "0");
     });
 
     document.getElementById("ef-save").addEventListener("click", () => {

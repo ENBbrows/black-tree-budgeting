@@ -25,7 +25,10 @@
     <img src="assets/emblem-gold.png" alt="" style="height:30px">
     <img src="assets/wordmark-gold.png" alt="Black Tree Investments" style="height:26px">
   </div>
-  <button class="bt-btn bt-btn--ghost bt-btn--sm" id="admin-logout" style="display:none">Log out</button>
+  <div style="display:flex;gap:10px;align-items:center">
+    <a href="dashboard.html" class="bt-btn bt-btn--ghost bt-btn--sm" style="text-decoration:none">← Dashboard</a>
+    <button class="bt-btn bt-btn--ghost bt-btn--sm" id="admin-logout" style="display:none">Log out</button>
+  </div>
 </div>
 
 <div class="bt-container" style="max-width:720px">
@@ -90,7 +93,7 @@
         <h2 style="margin:0">Roster</h2>
         <button class="bt-btn bt-btn--ghost bt-btn--sm" id="roster-refresh">Refresh</button>
       </div>
-      <p class="bt-sub" style="margin-bottom:10px">Email, role, and who's linked to whom — never any financial data.</p>
+      <p class="bt-sub" id="roster-summary" style="margin-bottom:10px">Loading…</p>
       <div id="roster-list"><div class="bt-empty">Loading…</div></div>
     </div>
   </div>
@@ -108,12 +111,28 @@
     el.style.color = ok ? "var(--bt-green)" : "var(--bt-red)";
   }
 
+  function formatLastActive(ts) {
+    if (!ts) return "Never signed in";
+    const mins = (Date.now() - new Date(ts).getTime()) / 60000;
+    if (mins < 5) return "🟢 Online now";
+    if (mins < 60) return `Active ${Math.round(mins)}m ago`;
+    const hours = mins / 60;
+    if (hours < 24) return `Active ${Math.round(hours)}h ago`;
+    const days = hours / 24;
+    if (days < 30) return `Active ${Math.round(days)}d ago`;
+    return "Active over a month ago";
+  }
+
   async function loadRoster() {
     const wrap = document.getElementById("roster-list");
+    const summaryEl = document.getElementById("roster-summary");
     wrap.innerHTML = '<div class="bt-empty">Loading…</div>';
-    const { data, error } = await btSupabase.from("bt_profiles").select("id,email,full_name,role,agent_id").order("email");
-    if (error) { wrap.innerHTML = '<div class="bt-empty">Couldn\'t load the roster.</div>'; return; }
-    if (!data.length) { wrap.innerHTML = '<div class="bt-empty">No accounts yet.</div>'; return; }
+    summaryEl.textContent = "Loading…";
+    const { data, error } = await btSupabase.from("bt_profiles").select("id,email,full_name,role,agent_id,last_active_at").order("email");
+    if (error) { wrap.innerHTML = '<div class="bt-empty">Couldn\'t load the roster.</div>'; summaryEl.textContent = ""; return; }
+    if (!data.length) { wrap.innerHTML = '<div class="bt-empty">No accounts yet.</div>'; summaryEl.textContent = "0 accounts registered."; return; }
+    const onlineCount = data.filter((p) => p.last_active_at && (Date.now() - new Date(p.last_active_at).getTime()) < 5 * 60000).length;
+    summaryEl.textContent = `${data.length} account${data.length === 1 ? "" : "s"} registered · ${onlineCount} online now. Email, role, and who's linked to whom — never any financial data.`;
     const byId = Object.fromEntries(data.map((p) => [p.id, p]));
     wrap.innerHTML = data.map((p) => {
       const linked = p.role === "client" && p.agent_id ? byId[p.agent_id] : null;
@@ -122,7 +141,7 @@
       <div class="bt-roster-row">
         <div>
           <div>${btEscapeHtml(p.full_name || p.email)} <span class="bt-role-tag">${btEscapeHtml(p.role)}</span></div>
-          <div class="meta">${btEscapeHtml(p.email)}${linkNote ? " · " + linkNote : ""}</div>
+          <div class="meta">${btEscapeHtml(p.email)}${linkNote ? " · " + linkNote : ""} · ${formatLastActive(p.last_active_at)}</div>
         </div>
       </div>`;
     }).join("");
@@ -156,6 +175,7 @@
     }
 
     window.btCurrentUserId = session.user.id;
+    btTouchActivity(session.user.id);
     document.getElementById("admin-logout").style.display = "";
     document.getElementById("admin-logout").addEventListener("click", async () => { await btSignOut(); window.location.replace("login.html"); });
 

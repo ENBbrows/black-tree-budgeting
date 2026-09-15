@@ -46,6 +46,12 @@ async function btGetSession() {
   return data.session;
 }
 
+/** Fire-and-forget "I'm here" ping so the admin roster can show who's actively using the platform. Never blocks the caller and never throws. */
+function btTouchActivity(uid) {
+  if (!uid || !navigator.onLine) return;
+  btSupabase.from("bt_profiles").update({ last_active_at: new Date().toISOString() }).eq("id", uid).then(() => {}, () => {});
+}
+
 /**
  * Call at the top of every protected page. If there's no session at all
  * (never logged in on this device), sends the visitor to the login
@@ -60,6 +66,7 @@ async function btRequireAuth() {
     window.location.replace("login.html?redirect=" + encodeURIComponent(here));
     return null;
   }
+  btTouchActivity(session.user.id);
   return session.user;
 }
 
