@@ -124,6 +124,12 @@
 
   <div id="bt-flags"></div>
 
+  <div class="bt-card bt-invest-card" id="debt-cta" style="display:none">
+    <h2>💳 Extra room to pay down debt</h2>
+    <p id="debt-cta-text">—</p>
+    <button class="bt-btn bt-btn--gold" id="debt-cta-btn">Log a payment</button>
+  </div>
+
   <div class="bt-card bt-invest-card" id="invest-cta" style="display:none">
     <h2>💬 Room to invest more</h2>
     <p id="invest-cta-text">Your budget's healthy and you have disposable income beyond essentials and savings — a good moment to talk with your advisor about your Emergency Fund, Critical Illness and Life Insurance coverage, retirement contributions, or other ways to secure your family's future.</p>
@@ -434,6 +440,21 @@
       `mailto:${BT_CONFIG.SUPPORT_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   }
 
+  function renderDebtCta(store, summary) {
+    const card = document.getElementById("debt-cta");
+    if (readOnly) { card.style.display = "none"; return; }
+    const opp = btDebtPayoffOpportunity(store, summary);
+    if (!opp.eligible) { card.style.display = "none"; return; }
+    card.style.display = "";
+    const rateNote = opp.topDebt.interest_rate != null ? ` (${opp.topDebt.interest_rate}% interest)` : "";
+    document.getElementById("debt-cta-text").textContent =
+      `You have ${fmtMoney(opp.disposable)} left over this month after essentials and savings. Putting some of it toward ${opp.topDebt.debt_name}${rateNote} — your highest-priority debt — would save you the most in interest.`;
+    const btn = document.getElementById("debt-cta-btn");
+    btn.textContent = `Log a payment toward ${opp.topDebt.debt_name}`;
+    btn.dataset.liabilityId = opp.topDebt.id;
+    btn.dataset.amount = Math.round(opp.disposable);
+  }
+
   function renderStats(elId, period) {
     const el = document.getElementById(elId);
     const netClass = period.net > 0 ? "pos" : period.net < 0 ? "neg" : "";
@@ -616,15 +637,7 @@
   }
 
   function renderDebts(store) {
-    // Debt avalanche order: highest interest rate first, since that's the
-    // one costing the most to carry — debts with no rate entered sort last
-    // rather than being treated as 0%, since that's unknown, not free.
-    const list = btLiabilityProgress(store).sort((a, b) => {
-      if (a.interest_rate == null && b.interest_rate == null) return 0;
-      if (a.interest_rate == null) return 1;
-      if (b.interest_rate == null) return -1;
-      return b.interest_rate - a.interest_rate;
-    });
+    const list = btDebtAvalancheOrder(store);
     const wrap = document.getElementById("debts-list");
     if (!list.length) { wrap.innerHTML = '<div class="bt-empty">No debts tracked.</div>'; return; }
     const topPriorityId = list.length > 1 && list[0].interest_rate != null ? list[0].id : null;
@@ -919,6 +932,7 @@
     const summary = btDashboardSummary(store, viewCurrency);
     const flags = btHealthFlags(store, summary);
     renderFlags(flags);
+    renderDebtCta(store, summary);
     renderInvestCta(store, summary, flags);
     renderWeekSpend(summary.periods.week);
     renderStats("stats-month", summary.periods.month);
@@ -1023,6 +1037,16 @@
       document.getElementById("toggle-bill-form").addEventListener("click", () => document.getElementById("bill-form").classList.toggle("show"));
 
       btWireScanFab("scan-fab-btn", "scan-fab-file");
+
+      document.getElementById("debt-cta-btn").addEventListener("click", () => {
+        const btn = document.getElementById("debt-cta-btn");
+        sessionStorage.setItem("bt_expense_prefill", JSON.stringify({
+          category: BT_CONFIG.DEBT_LINK_CATEGORY,
+          liability_id: btn.dataset.liabilityId,
+          amount: Number(btn.dataset.amount) || null
+        }));
+        window.location.href = "expense.html";
+      });
 
       document.getElementById("setpw-dismiss").addEventListener("click", () => {
         sessionStorage.setItem("bt-setpw-dismissed", "1");

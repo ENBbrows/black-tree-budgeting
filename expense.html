@@ -314,10 +314,33 @@
       try { applyScanGuess(JSON.parse(pending)); } catch (e) { /* malformed handoff — just skip it */ }
     }
 
+    // Hand-off from the Dashboard's "extra to put toward debt" prompt, or
+    // similar shortcuts elsewhere that want this form pre-aimed at a
+    // specific category/goal/debt. The target goal/debt might not be in
+    // the local cache yet on a brand-new device, so its id is re-applied
+    // once btSync below has actually pulled it in.
+    let pendingLinkId = null;
+    const prefill = sessionStorage.getItem("bt_expense_prefill");
+    if (prefill) {
+      sessionStorage.removeItem("bt_expense_prefill");
+      try {
+        const p = JSON.parse(prefill);
+        if (p.category) { document.getElementById("f-category").value = p.category; categoryManuallySet = true; }
+        updateLinkOptions();
+        pendingLinkId = p.liability_id || p.goal_id || null;
+        if (pendingLinkId) document.getElementById("f-link").value = pendingLinkId;
+        if (p.amount) document.getElementById("f-amount").value = Number(p.amount).toFixed(2);
+        toast("Pre-filled — confirm the amount and save.");
+      } catch (e) { /* malformed handoff — just skip it */ }
+    }
+
     updateNetBadge();
     renderRecent();
     updateLinkOptions();
-    btSync(btUid).then(() => { renderRecent(); updateLinkOptions(); refreshPaymentAccountSuggestions(); });
+    btSync(btUid).then(() => {
+      renderRecent(); updateLinkOptions(); refreshPaymentAccountSuggestions();
+      if (pendingLinkId) document.getElementById("f-link").value = pendingLinkId;
+    });
 
     document.getElementById("f-submit").addEventListener("click", () => {
       const notes = document.getElementById("f-desc").value.trim() || null;

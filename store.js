@@ -622,6 +622,24 @@ function btDisposableIncome(store, summary) {
   return { costOfLiving, savedThisMonth, disposable };
 }
 
+/** Debts still owed, in avalanche order — highest interest rate first, debts with no rate entered last (unknown, not free). Shared by the Dashboard's Debt Tracker list and the debt-payoff nudge below. */
+function btDebtAvalancheOrder(store) {
+  return btLiabilityProgress(store).sort((a, b) => {
+    if (a.interest_rate == null && b.interest_rate == null) return 0;
+    if (a.interest_rate == null) return 1;
+    if (b.interest_rate == null) return -1;
+    return b.interest_rate - a.interest_rate;
+  });
+}
+
+/** Whether there's meaningful disposable income this month worth nudging toward debt, and which debt (the avalanche-priority one) to suggest it go to. */
+function btDebtPayoffOpportunity(store, summary) {
+  const { disposable } = btDisposableIncome(store, summary);
+  const owed = btDebtAvalancheOrder(store).filter((l) => l.estimated_remaining > 0);
+  if (!owed.length || !(disposable > 0)) return { eligible: false, disposable, topDebt: null };
+  return { eligible: true, disposable, topDebt: owed[0] };
+}
+
 /** Red/Yellow/Green health flags, thresholds straight from the source spreadsheet's guideline sheets. */
 function btHealthFlags(store, summary, today = new Date()) {
   const T = BT_CONFIG.THRESHOLDS;
