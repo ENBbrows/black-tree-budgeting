@@ -23,6 +23,7 @@
   .bt-agent-banner { background: var(--bt-ink); color: var(--bt-white); text-align:center; padding: 10px; font-size: 0.85rem; }
   .bt-agent-banner a { color: var(--bt-gold-light); }
   #setpw-status.err { color: var(--bt-red); }
+  .bt-role-tag { font-size:0.68rem; text-transform:uppercase; letter-spacing:0.03em; padding:3px 8px; border-radius:999px; font-weight:700; }
   canvas { width: 100%; display:block; }
   .bt-section-head { display:flex; align-items:center; justify-content:space-between; margin: 26px 0 10px; }
   .bt-mini-form { display:none; margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--bt-border); }
@@ -175,6 +176,7 @@
         <h2>Debt Tracker</h2>
         <button class="bt-btn bt-btn--ghost bt-btn--sm" id="toggle-debt-form">+ Add debt</button>
       </div>
+      <p class="bt-sub" style="margin-bottom:10px" data-tip="Highest interest rate first — the debt avalanche method. Paying this one down fastest saves the most in interest overall. Debts with no rate entered are listed last.">Sorted by interest rate — highest first, to pay off first.</p>
       <div id="debts-list"><div class="bt-empty">No debts tracked.</div></div>
       <div class="bt-mini-form" id="debt-form">
         <label data-tip="e.g. &quot;Car Loan&quot; or &quot;Credit Card&quot;.">Debt name</label>
@@ -614,9 +616,18 @@
   }
 
   function renderDebts(store) {
-    const list = btLiabilityProgress(store);
+    // Debt avalanche order: highest interest rate first, since that's the
+    // one costing the most to carry — debts with no rate entered sort last
+    // rather than being treated as 0%, since that's unknown, not free.
+    const list = btLiabilityProgress(store).sort((a, b) => {
+      if (a.interest_rate == null && b.interest_rate == null) return 0;
+      if (a.interest_rate == null) return 1;
+      if (b.interest_rate == null) return -1;
+      return b.interest_rate - a.interest_rate;
+    });
     const wrap = document.getElementById("debts-list");
     if (!list.length) { wrap.innerHTML = '<div class="bt-empty">No debts tracked.</div>'; return; }
+    const topPriorityId = list.length > 1 && list[0].interest_rate != null ? list[0].id : null;
     wrap.innerHTML = list.map((l) => {
       const pctPaid = l.current_balance > 0 ? Math.min(1, l.paid_via_tracker / l.current_balance) : 0;
       const dot = l.pace_status ? `<span class="bt-status-dot bt-status-dot--${l.pace_status}" title="Payoff pace"></span>` : "";
@@ -628,9 +639,10 @@
             ? `On track for ${l.target_payoff_date}`
             : `Behind pace for ${l.target_payoff_date}`;
       }
+      const priorityTag = l.id === topPriorityId ? ' <span class="bt-role-tag" style="background:var(--bt-red-bg);color:var(--bt-red)">🔥 Pay off first</span>' : "";
       return `
       <div class="bt-debt-item">
-        <div class="row1"><span style="display:flex;align-items:center;gap:6px">${dot}<strong>${btEscapeHtml(l.debt_name)}</strong></span><span>${fmtHome(l.estimated_remaining)} left</span></div>
+        <div class="row1"><span style="display:flex;align-items:center;gap:6px">${dot}<strong>${btEscapeHtml(l.debt_name)}</strong>${priorityTag}</span><span>${fmtHome(l.estimated_remaining)} left</span></div>
         ${progressGraphic(pctPaid)}
         <div class="meta">${btEscapeHtml(l.lender) || "—"}${l.interest_rate ? " · " + l.interest_rate + "%" : ""} · ${fmtHome(l.paid_via_tracker)} paid via tracker${paceNote ? " · " + paceNote : ""}${l.needs_payment_reminder ? ` · no payment in ${l.days_since_payment}d` : ""}</div>
       </div>`;
