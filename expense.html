@@ -193,20 +193,6 @@
     }
   }
 
-  let scanLib = null;
-  async function loadScanLib() {
-    if (scanLib) return scanLib;
-    await new Promise((resolve, reject) => {
-      const s = document.createElement("script");
-      s.src = "https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js";
-      s.onload = resolve;
-      s.onerror = reject;
-      document.head.appendChild(s);
-    });
-    scanLib = window.Tesseract;
-    return scanLib;
-  }
-
   function hideScanBubble() {
     document.getElementById("scan-bubble").classList.remove("show");
   }
@@ -245,38 +231,35 @@
     bubble.classList.add("show");
   }
 
+  function applyScanGuess(guess) {
+    const { amount, date, merchant, category, paymentType } = guess;
+    if (amount) document.getElementById("f-amount").value = amount.toFixed(2);
+    if (date) document.getElementById("f-date").value = date;
+    if (merchant && !document.getElementById("f-desc").value.trim()) document.getElementById("f-desc").value = merchant;
+    if (category) {
+      document.getElementById("f-category").value = category;
+      categoryManuallySet = true; // trust the scan over further auto-guessing from the description field
+    }
+    if (paymentType) document.getElementById("f-payment-type").value = paymentType;
+    updateLinkOptions();
+
+    const statusEl = document.getElementById("scan-status");
+    statusEl.classList.add("show");
+    statusEl.textContent = amount
+      ? "Image discarded — nothing was uploaded or saved. Double-check the details below before saving."
+      : "Couldn't find a clear total — image discarded, fill in the amount yourself.";
+    showScanBubble(category, paymentType, { amount, merchant, date });
+  }
+
   async function handleScanFile(file) {
     const statusEl = document.getElementById("scan-status");
     hideScanBubble();
     statusEl.classList.add("show");
     statusEl.textContent = "Loading scanner…";
     try {
-      const Tesseract = await loadScanLib();
       statusEl.textContent = "Reading bill… this can take a moment.";
-      const { data } = await Tesseract.recognize(file, "eng", {
-        logger: (m) => { if (m.status === "recognizing text") statusEl.textContent = `Reading bill… ${Math.round((m.progress || 0) * 100)}%`; }
-      });
-      const text = data.text || "";
-      const amount = btGuessAmountFromText(text);
-      const date = btGuessDateFromText(text);
-      const merchant = btGuessMerchantFromText(text);
-      const category = btGuessCategory(text);
-      const paymentType = btGuessPaymentType(text);
-
-      if (amount) document.getElementById("f-amount").value = amount.toFixed(2);
-      if (date) document.getElementById("f-date").value = date;
-      if (merchant && !document.getElementById("f-desc").value.trim()) document.getElementById("f-desc").value = merchant;
-      if (category) {
-        document.getElementById("f-category").value = category;
-        categoryManuallySet = true; // trust the scan over further auto-guessing from the description field
-      }
-      if (paymentType) document.getElementById("f-payment-type").value = paymentType;
-      updateLinkOptions();
-
-      statusEl.textContent = amount
-        ? "Image discarded — nothing was uploaded or saved. Double-check the details below before saving."
-        : "Couldn't find a clear total — image discarded, fill in the amount yourself.";
-      showScanBubble(category, paymentType, { amount, merchant, date });
+      const guess = await btScanBillImage(file, (progress) => { statusEl.textContent = `Reading bill… ${Math.round(progress * 100)}%`; });
+      applyScanGuess(guess);
     } catch (err) {
       console.error("Black Tree bill scan failed", err);
       statusEl.textContent = "Couldn't read that image — enter the details manually below.";
@@ -320,6 +303,16 @@
       e.target.value = "";
     });
     document.getElementById("bubble-done").addEventListener("click", hideScanBubble);
+
+    // A bill scanned from the Dashboard's shortcut hands off its already-guessed
+    // fields here (not the photo itself — browsers won't let a script reopen a
+    // file/camera picker after a navigation, so the scan runs where the user
+    // actually tapped, and only the small result comes along).
+    const pending = sessionStorage.getItem("bt_scan_pending");
+    if (pending) {
+      sessionStorage.removeItem("bt_scan_pending");
+      try { applyScanGuess(JSON.parse(pending)); } catch (e) { /* malformed handoff — just skip it */ }
+    }
 
     updateNetBadge();
     renderRecent();

@@ -115,6 +115,11 @@
     <a href="expense.html" class="bt-btn bt-btn--ghost">+ Log Expense</a>
   </div>
   <div class="bt-quick-actions">
+    <button type="button" class="bt-btn bt-btn--ghost" id="dash-scan-btn">📷 Scan a Bill</button>
+    <input type="file" id="dash-scan-file" accept="image/*" capture="environment" style="display:none" />
+  </div>
+  <p class="bt-sub" id="dash-scan-status" style="display:none;margin:-10px 0 14px"></p>
+  <div class="bt-quick-actions">
     <a href="statement.html" class="bt-btn bt-btn--ghost">📄 3-Month Cash Flow Statement</a>
   </div>
   <div class="bt-quick-actions">
@@ -957,6 +962,7 @@
     document.getElementById("toggle-goal-form").style.display = "none";
     document.getElementById("toggle-debt-form").style.display = "none";
     document.getElementById("toggle-bill-form").style.display = "none";
+    document.getElementById("dash-scan-btn").style.display = "none";
   }
 
   async function init() {
@@ -1005,6 +1011,25 @@
       document.getElementById("toggle-goal-form").addEventListener("click", () => document.getElementById("goal-form").classList.toggle("show"));
       document.getElementById("toggle-debt-form").addEventListener("click", () => document.getElementById("debt-form").classList.toggle("show"));
       document.getElementById("toggle-bill-form").addEventListener("click", () => document.getElementById("bill-form").classList.toggle("show"));
+
+      document.getElementById("dash-scan-btn").addEventListener("click", () => document.getElementById("dash-scan-file").click());
+      document.getElementById("dash-scan-file").addEventListener("change", async (e) => {
+        const file = e.target.files[0];
+        e.target.value = "";
+        if (!file) return;
+        const statusEl = document.getElementById("dash-scan-status");
+        statusEl.style.display = "block";
+        statusEl.textContent = "Loading scanner…";
+        try {
+          const guess = await btScanBillImage(file, (progress) => { statusEl.textContent = `Reading bill… ${Math.round(progress * 100)}%`; });
+          sessionStorage.setItem("bt_scan_pending", JSON.stringify(guess));
+          statusEl.textContent = "Got it — taking you to Log Expense to confirm the details…";
+          window.location.href = "expense.html";
+        } catch (err) {
+          console.error("Black Tree bill scan failed", err);
+          statusEl.textContent = "Couldn't read that image — try Log Expense and enter it manually.";
+        }
+      });
 
       document.getElementById("setpw-dismiss").addEventListener("click", () => {
         sessionStorage.setItem("bt-setpw-dismissed", "1");

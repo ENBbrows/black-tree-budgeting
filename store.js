@@ -335,6 +335,43 @@ function btGuessMerchantFromText(text) {
   return null;
 }
 
+/* ── Shared bill/receipt OCR — used by both the Expense page's own scan
+   button and the Dashboard's "Scan a Bill" shortcut, so the Tesseract
+   loading and text-guessing logic lives in exactly one place. ── */
+let btScanLib = null;
+async function btLoadScanLib() {
+  if (btScanLib) return btScanLib;
+  await new Promise((resolve, reject) => {
+    const s = document.createElement("script");
+    s.src = "https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js";
+    s.onload = resolve;
+    s.onerror = reject;
+    document.head.appendChild(s);
+  });
+  btScanLib = window.Tesseract;
+  return btScanLib;
+}
+
+/**
+ * Runs OCR on a bill/receipt image — a File/Blob or a data URL string,
+ * Tesseract accepts either — and returns best-guess fields. onProgress,
+ * if given, is called with a 0–1 fraction while text recognition runs.
+ */
+async function btScanBillImage(file, onProgress) {
+  const Tesseract = await btLoadScanLib();
+  const { data } = await Tesseract.recognize(file, "eng", {
+    logger: (m) => { if (m.status === "recognizing text" && onProgress) onProgress(m.progress || 0); }
+  });
+  const text = data.text || "";
+  return {
+    amount: btGuessAmountFromText(text),
+    date: btGuessDateFromText(text),
+    merchant: btGuessMerchantFromText(text),
+    category: btGuessCategory(text),
+    paymentType: btGuessPaymentType(text)
+  };
+}
+
 /** Currencies a client can pick from: their home currency first, then the configured extras. */
 function btCurrencyOptions(profile) {
   const home = profile?.currency || "TTD";
