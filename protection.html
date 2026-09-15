@@ -128,6 +128,9 @@
 
 <div class="bt-toast" id="bt-toast"></div>
 
+<button type="button" class="bt-fab" id="scan-fab-btn" title="Scan a bill" aria-label="Scan a bill">📷</button>
+<input type="file" id="scan-fab-file" accept="image/*" capture="environment" style="display:none" />
+
 <nav class="bt-bottom-nav">
   <a href="income.html">Income</a>
   <a href="expense.html">Expense</a>
@@ -280,6 +283,8 @@
       document.getElementById("bf-chevron").classList.toggle("collapsed", collapsed);
       localStorage.setItem(bfCollapseKey, collapsed ? "1" : "0");
     });
+
+    btWireScanFab("scan-fab-btn", "scan-fab-file");
 
     document.getElementById("ef-save").addEventListener("click", () => {
       const min = BT_CONFIG.PROTECTION.emergencyFundMinMonths;

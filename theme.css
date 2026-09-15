@@ -151,6 +151,16 @@ input:focus, select:focus, textarea:focus {
 .bt-bottom-nav a { flex: 1; text-align: center; padding: 6px 4px; font-size: 0.72rem; color: var(--bt-muted); text-decoration: none; font-weight: 600; }
 .bt-bottom-nav a.active { color: var(--bt-gold); }
 
+.bt-fab {
+  position: fixed; right: 18px; bottom: calc(78px + env(safe-area-inset-bottom)); z-index: 45;
+  width: 56px; height: 56px; border-radius: 50%; border: none;
+  background: var(--bt-gold); color: var(--bt-ink); font-size: 1.4rem;
+  display: flex; align-items: center; justify-content: center; cursor: pointer;
+  box-shadow: 0 4px 14px rgba(34,30,31,0.28);
+}
+.bt-fab:active { transform: scale(0.94); }
+.bt-fab:disabled { opacity: 0.6; cursor: default; }
+
 @media (min-width: 820px) {
   .bt-dash-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; align-items: start; }
 }

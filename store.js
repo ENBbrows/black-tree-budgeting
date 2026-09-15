@@ -372,6 +372,41 @@ async function btScanBillImage(file, onProgress) {
   };
 }
 
+/**
+ * Wires a floating "scan a bill" button (plus its paired hidden file
+ * input, both found by id) present on Dashboard/Income/Statement/
+ * Protection: tap it, take or pick a photo, it's read on-device via
+ * btScanBillImage, and the guessed fields hand off to Log Expense via
+ * sessionStorage — never the photo itself, since a script can't reopen
+ * a file/camera picker after a navigation without a fresh tap, and a
+ * full photo risks sessionStorage's size limit anyway. No-ops if either
+ * element isn't on the current page.
+ */
+function btWireScanFab(btnId, fileId) {
+  const btn = document.getElementById(btnId);
+  const fileInput = document.getElementById(fileId);
+  if (!btn || !fileInput) return;
+  const idleLabel = btn.textContent;
+  btn.addEventListener("click", () => fileInput.click());
+  fileInput.addEventListener("change", async (e) => {
+    const file = e.target.files[0];
+    e.target.value = "";
+    if (!file) return;
+    btn.disabled = true;
+    btn.textContent = "⏳";
+    try {
+      const guess = await btScanBillImage(file);
+      sessionStorage.setItem("bt_scan_pending", JSON.stringify(guess));
+      window.location.href = "expense.html";
+    } catch (err) {
+      console.error("Black Tree bill scan failed", err);
+      btn.disabled = false;
+      btn.textContent = idleLabel;
+      if (typeof toast === "function") toast("Couldn't read that image — try again or enter it manually.");
+    }
+  });
+}
+
 /** Currencies a client can pick from: their home currency first, then the configured extras. */
 function btCurrencyOptions(profile) {
   const home = profile?.currency || "TTD";

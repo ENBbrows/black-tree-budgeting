@@ -84,6 +84,9 @@
 
 <div class="bt-toast" id="bt-toast"></div>
 
+<button type="button" class="bt-fab" id="scan-fab-btn" title="Scan a bill" aria-label="Scan a bill">📷</button>
+<input type="file" id="scan-fab-file" accept="image/*" capture="environment" style="display:none" />
+
 <nav class="bt-bottom-nav">
   <a href="income.html" class="active">Income</a>
   <a href="expense.html">Expense</a>
@@ -173,6 +176,7 @@
     updateNetBadge();
     renderRecent();
     btSync(btUid).then(() => { renderRecent(); refreshPaymentAccountSuggestions(); });
+    btWireScanFab("scan-fab-btn", "scan-fab-file");
 
     document.getElementById("f-submit").addEventListener("click", () => {
       const source = document.getElementById("f-source").value.trim();
