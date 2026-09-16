@@ -16,8 +16,11 @@
 <style>
   body { display: flex; align-items: center; min-height: 100vh; }
   .bt-login-card { text-align: center; }
-  .bt-login-card img.emblem { height: 84px; margin-bottom: 14px; }
-  .bt-login-card img.wordmark { height: 46px; margin-bottom: 26px; }
+  .bt-login-card img.emblem { height: 108px; margin-bottom: 16px; }
+  .bt-login-card .wordmark-stack { display: flex; flex-direction: column; align-items: center; gap: 6px; margin-bottom: 26px; }
+  .bt-login-card .wordmark-stack img { display: block; }
+  .bt-login-card img.wordmark-title { width: 300px; max-width: 100%; height: auto; }
+  .bt-login-card img.wordmark-sub { width: 300px; max-width: 100%; height: auto; }
   #bt-status { font-size: 0.86rem; margin-top: 14px; min-height: 1.2em; }
   #bt-status.err { color: var(--bt-red); }
   #bt-status.ok { color: var(--bt-green); }
@@ -30,7 +33,10 @@
 <body>
 <div class="bt-container bt-login-card">
   <img class="emblem" src="assets/emblem-gold.png" alt="">
-  <img class="wordmark" src="assets/wordmark-gold.png" alt="Black Tree Investments">
+  <div class="wordmark-stack">
+    <img class="wordmark-title" src="assets/wordmark-top-gold.png" alt="Black Tree">
+    <img class="wordmark-sub" src="assets/wordmark-bottom-gold.png" alt="Investments">
+  </div>
 
   <div class="bt-card" style="text-align:left">
     <h1 style="text-align:center">Sign in</h1>

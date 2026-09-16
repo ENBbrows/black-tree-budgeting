@@ -47,9 +47,13 @@ a { color: var(--bt-gold); }
   gap: 10px;
   padding: 22px 16px 14px; text-align: center;
 }
-.bt-header img { height: 40px; }
 .bt-header--row { justify-content: space-between; text-align: left; }
-.bt-brand { display: flex; align-items: center; gap: 8px; }
+.bt-brand { display: flex; align-items: center; gap: 10px; }
+.bt-emblem { height: 44px; width: auto; display: block; }
+.bt-wordmark-stack { display: flex; flex-direction: column; gap: 3px; }
+.bt-wordmark-stack img { display: block; width: auto; }
+.bt-wordmark-title { height: 17px; }
+.bt-wordmark-sub { height: 9px; }
 
 h1, h2, h3 { font-family: var(--bt-font-head); font-weight: 600; margin: 0 0 6px; letter-spacing: -0.01em; }
 h1 { font-size: 1.5rem; }

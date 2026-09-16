@@ -32,6 +32,9 @@
   .bt-goal-item:last-child, .bt-debt-item:last-child { border-bottom:none; }
   .bt-goal-item .row1, .bt-debt-item .row1 { display:flex; justify-content:space-between; font-size:0.92rem; margin-bottom:6px; }
   .bt-goal-item .meta, .bt-debt-item .meta { font-size:0.78rem; color:var(--bt-muted); margin-top:6px; }
+  .bt-goal-adjust-btn { background:none; border:none; padding:0; margin-left:8px; color: var(--bt-gold); font-family: inherit; font-size: 0.78rem; cursor:pointer; text-decoration: underline; }
+  .bt-goal-adjust-form { display:none; margin-top:10px; padding-top:10px; border-top:1px dashed var(--bt-border); }
+  .bt-goal-adjust-form.show { display:block; }
   select[readonly], input[readonly] { background: var(--bt-cream); }
 
   .bt-view-toggle { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin: 14px 0 4px; }
@@ -54,9 +57,13 @@
   .bt-badges-grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 14px; }
   .bt-badge-card { text-align:center; background: var(--bt-white); border:1px solid var(--bt-border); border-radius: 14px; padding: 16px 10px; transition: box-shadow .4s, border-color .4s; }
   .bt-badge-card.earned { box-shadow: 0 0 18px 3px rgba(194,145,51,0.5); border-color: var(--bt-gold); }
+  .bt-badge-card.locked { opacity: 0.6; }
   .bt-badge-ring { width: 62px; height: 62px; border-radius: 50%; margin: 0 auto 8px; position: relative; }
   .bt-badge-ring::after { content:""; position:absolute; inset: 6px; border-radius:50%; background: var(--bt-white); }
   .bt-badge-ring .icon-inner { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:1.6rem; z-index:1; }
+  .bt-debt-power-wrap { height: 62px; display:flex; align-items:center; justify-content:center; margin: 0 auto 8px; }
+  .bt-debt-power { width: 56px; height: 14px; border-radius: 7px; background: var(--bt-border); position: relative; overflow: hidden; flex-shrink:0; }
+  .bt-debt-power .fill { position:absolute; inset:0; border-radius:7px; background: linear-gradient(90deg, var(--bt-red) 0%, var(--bt-yellow) 50%, var(--bt-green) 100%); }
   .bt-badge-card .name { font-size: 0.82rem; font-weight:600; margin-bottom:4px; }
   .bt-badge-card .status { font-size: 0.72rem; color: var(--bt-muted); }
   .bt-badge-card.earned .status { color: var(--bt-green); font-weight:600; }
@@ -66,8 +73,11 @@
 <div id="bt-agent-banner" class="bt-agent-banner" style="display:none"></div>
 <div class="bt-header bt-header--row">
   <div class="bt-brand">
-    <img src="assets/emblem-gold.png" alt="" style="height:30px">
-    <img src="assets/wordmark-gold.png" alt="Black Tree Investments" style="height:26px">
+    <img src="assets/emblem-gold.png" alt="" class="bt-emblem">
+    <div class="bt-wordmark-stack">
+      <img src="assets/wordmark-top-gold.png" alt="Black Tree" class="bt-wordmark-title">
+      <img src="assets/wordmark-bottom-gold.png" alt="Investments" class="bt-wordmark-sub">
+    </div>
   </div>
   <div class="bt-topbar-right">
     <a id="bt-agent-link" href="agent.html" class="bt-btn bt-btn--ghost bt-btn--sm" style="display:none;text-decoration:none">My Clients</a>
@@ -560,11 +570,15 @@
     } catch (e) { /* Web Audio unavailable — badge still glows silently */ }
   }
 
+  const GOAL_BADGE_ICONS = { "House Down Payment": "🏠", "Car Down Payment": "🚗" };
+
   function computeBadges(store, summary) {
     const badges = [];
-    btGoalProgress(store).forEach((g) => {
+    // Vacation Vault goals get their own dedicated badge below, so they're
+    // excluded here to avoid showing up twice.
+    btGoalProgress(store).filter((g) => g.category !== "Vacation Vault").forEach((g) => {
       badges.push({
-        id: "goal-" + g.id, icon: "🎯", name: g.description, pct: g.progress_pct, earned: g.progress_pct >= 1,
+        id: "goal-" + g.id, type: "goal", icon: GOAL_BADGE_ICONS[g.category] || "🎯", name: g.description, pct: g.progress_pct, earned: g.progress_pct >= 1,
         status: g.progress_pct >= 1 ? ("Completed" + (g.target_date ? " · target " + g.target_date : "")) : fmtPct(g.progress_pct) + " there"
       });
     });
@@ -572,23 +586,25 @@
       const pct = l.current_balance > 0 ? Math.min(1, l.paid_via_tracker / l.current_balance) : 0;
       const earned = l.estimated_remaining <= 0;
       badges.push({
-        id: "debt-" + l.id, icon: "🏁", name: l.debt_name, pct, earned,
+        id: "debt-" + l.id, type: "debt", name: l.debt_name, pct, earned,
         status: earned ? ("Settled" + (l.target_payoff_date ? " · target " + l.target_payoff_date : "")) : fmtPct(pct) + " paid off"
       });
     });
     // Vacation Vault: dormant until the client has actually unlocked it (Emergency,
     // Critical Illness, and Burial Fund all covered) — that's the "plugged in
     // information" gate. Once active, it tracks the same way a goal does: any
-    // goal(s) filed under the "Vacation Vault" category, saved vs target.
+    // goal(s) filed under the "Vacation Vault" category, saved vs target. It's
+    // a standalone badge, separate from the per-goal badges above.
     const vv = btVacationVaultUnlockProgress(store, viewCurrency, store.profile);
     const vaultGoals = btGoalProgress(store).filter((g) => g.category === "Vacation Vault");
     const vaultSaved = vaultGoals.reduce((s, g) => s + g.saved_amount, 0);
     const vaultTarget = vaultGoals.reduce((s, g) => s + g.target_amount, 0);
     const vaultEarned = vv.unlocked && vaultTarget > 0 && vaultSaved >= vaultTarget;
     badges.push({
-      id: "vacation-vault", icon: "🌴", name: "Vacation Vault",
+      id: "vacation-vault", type: "vault", icon: "🌴", name: "Vacation Vault",
       pct: vv.unlocked && vaultTarget > 0 ? Math.min(1, vaultSaved / vaultTarget) : 0,
       earned: vaultEarned,
+      locked: !vv.unlocked,
       status: !vv.unlocked
         ? "Locked — cover your Emergency, Critical Illness & Burial Funds first"
         : vaultTarget > 0
@@ -604,10 +620,19 @@
     if (!badges.length) { wrap.innerHTML = '<div class="bt-empty">Add a goal or debt to start earning badges.</div>'; return; }
 
     wrap.innerHTML = badges.map((b) => {
+      if (b.type === "debt") {
+        const emptyPct = Math.round((1 - b.pct) * 100);
+        return `
+        <div class="bt-badge-card ${b.earned ? "earned" : ""}">
+          <div class="bt-debt-power-wrap"><div class="bt-debt-power" title="${Math.round(b.pct * 100)}% paid off"><div class="fill" style="clip-path: inset(0 ${emptyPct}% 0 0)"></div></div></div>
+          <div class="name">${btEscapeHtml(b.name)}</div>
+          <div class="status">${btEscapeHtml(b.status)}</div>
+        </div>`;
+      }
       const deg = Math.round(b.pct * 360);
       return `
-      <div class="bt-badge-card ${b.earned ? "earned" : ""}">
-        <div class="bt-badge-ring" style="background:conic-gradient(var(--bt-gold) ${deg}deg, var(--bt-border) ${deg}deg)"><span class="icon-inner">${b.icon}</span></div>
+      <div class="bt-badge-card ${b.earned ? "earned" : ""}${b.locked ? " locked" : ""}">
+        <div class="bt-badge-ring" style="background:conic-gradient(var(--bt-gold) ${deg}deg, var(--bt-border) ${deg}deg)"><span class="icon-inner">${b.locked ? "🔒" : b.icon}</span></div>
         <div class="name">${btEscapeHtml(b.name)}</div>
         <div class="status">${btEscapeHtml(b.status)}</div>
       </div>`;
@@ -637,7 +662,15 @@
       <div class="bt-goal-item">
         <div class="row1"><strong>${btEscapeHtml(g.description)}</strong><span>${fmtHome(g.saved_amount)} / ${fmtHome(g.target_amount)}</span></div>
         ${progressGraphic(g.progress_pct)}
-        <div class="meta">${g.category}${g.target_date ? " · by " + g.target_date : ""} · ${fmtPct(g.progress_pct)} complete</div>
+        <div class="meta">${g.category}${g.target_date ? " · by " + g.target_date : ""} · ${fmtPct(g.progress_pct)} complete${readOnly ? "" : ` · <button type="button" class="bt-goal-adjust-btn" data-goal-id="${g.id}">Adjust target</button>`}</div>
+        ${readOnly ? "" : `
+        <div class="bt-goal-adjust-form" id="goal-adjust-${g.id}">
+          <div class="bt-field-row">
+            <div><label>New target amount</label><input type="number" min="0" step="0.01" class="ga-target" value="${g.target_amount}"></div>
+            <div><label>New target date <span style="font-weight:400;color:var(--bt-muted)">(optional)</span></label><input type="date" class="ga-date" value="${g.target_date || ""}"></div>
+          </div>
+          <button type="button" class="bt-btn bt-btn--gold bt-btn--sm ga-save" data-goal-id="${g.id}" style="margin-top:8px">Save</button>
+        </div>`}
       </div>
     `).join("");
   }
@@ -1041,6 +1074,25 @@
       document.getElementById("toggle-goal-form").addEventListener("click", () => document.getElementById("goal-form").classList.toggle("show"));
       document.getElementById("toggle-debt-form").addEventListener("click", () => document.getElementById("debt-form").classList.toggle("show"));
       document.getElementById("toggle-bill-form").addEventListener("click", () => document.getElementById("bill-form").classList.toggle("show"));
+
+      document.getElementById("goals-list").addEventListener("click", (e) => {
+        const adjustBtn = e.target.closest(".bt-goal-adjust-btn");
+        if (adjustBtn) {
+          document.getElementById("goal-adjust-" + adjustBtn.dataset.goalId).classList.toggle("show");
+          return;
+        }
+        const saveBtn = e.target.closest(".ga-save");
+        if (saveBtn) {
+          const id = saveBtn.dataset.goalId;
+          const form = document.getElementById("goal-adjust-" + id);
+          const target_amount = parseFloat(form.querySelector(".ga-target").value);
+          const target_date = form.querySelector(".ga-date").value || null;
+          if (!target_amount || target_amount <= 0) return toast("Enter a valid target amount.");
+          btUpdateGoal(btUid, id, { target_amount, target_date });
+          toast("Target updated");
+          renderAll();
+        }
+      });
 
       btWireScanFab("scan-fab-btn", "scan-fab-file");
 

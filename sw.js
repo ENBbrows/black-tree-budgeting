@@ -5,7 +5,7 @@
    requests fall back to network-first so a live connection always
    wins when available, cache when it isn't. */
 
-const BT_CACHE = "blacktree-shell-v19";
+const BT_CACHE = "blacktree-shell-v20";
 
 const BT_PRECACHE = [
   "login.html",
@@ -31,6 +31,8 @@ const BT_PRECACHE = [
   "assets/icon-512.png",
   "assets/icon-180.png",
   "assets/wordmark-gold.png",
+  "assets/wordmark-top-gold.png",
+  "assets/wordmark-bottom-gold.png",
   "assets/wordmark-ivory.png",
   "assets/emblem-gold.png",
   "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"
