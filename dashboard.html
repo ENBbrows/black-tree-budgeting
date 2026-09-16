@@ -106,8 +106,10 @@
       <div><label data-tip="The currency label shown next to your numbers, e.g. TTD, USD.">Currency</label><input id="s-currency" type="text" maxlength="6" /></div>
       <div><label data-tip="What percent of your income you're aiming to save each year. 20% is a good target for long-term financial independence.">Annual savings target</label><input id="s-target" type="number" min="0" max="100" step="1" /></div>
     </div>
-    <label data-tip="How many people your income supports (yourself included) — just a headcount, used to give the Cost of Living figures context. Doesn't affect any calculation.">Dependents</label>
-    <input id="s-dependents" type="number" min="0" step="1" style="max-width:120px" />
+    <div class="bt-field-row">
+      <div><label data-tip="How many people your income supports (yourself included) — just a headcount, used to give the Cost of Living figures context. Doesn't affect any calculation.">Dependents</label><input id="s-dependents" type="number" min="0" step="1" /></div>
+      <div><label data-tip="Used only to unlock the Burial Fund section of the Protection Planner once you turn 50 — it isn't shown before then.">Date of birth <span style="font-weight:400;color:var(--bt-muted)">(optional)</span></label><input id="s-dob" type="date" /></div>
+    </div>
 
     <div id="fx-rates-wrap" style="margin-top:16px;padding-top:14px;border-top:1px dashed var(--bt-border)">
       <label style="margin:0 0 8px" data-tip="Manual exchange rates for any foreign currency you log income in — set once, updated whenever you like. Nothing is fetched automatically, so this keeps working offline.">Exchange rates</label>
@@ -498,7 +500,9 @@
       sub.textContent = "🎉 Unlocked! Every base is covered — head to the Vacation Vault to set aside extra income.";
       document.getElementById("vv-unlock-graphic").innerHTML = progressGraphic(1, "var(--bt-green)");
     } else {
-      sub.textContent = "Fully fund your Emergency Fund, Critical Illness Fund, and Burial Fund to unlock this reward.";
+      sub.textContent = btBurialFundApplies(store.profile)
+        ? "Fully fund your Emergency Fund, Critical Illness Fund, and Burial Fund to unlock this reward."
+        : "Fully fund your Emergency Fund and Critical Illness Fund to unlock this reward.";
       document.getElementById("vv-unlock-graphic").innerHTML = progressGraphic(prog.pct);
     }
     document.getElementById("vv-unlock-actual").textContent = fmtMoney(prog.totalSaved) + " saved";
@@ -593,7 +597,7 @@
       earned: vaultEarned,
       locked: !vv.unlocked,
       status: !vv.unlocked
-        ? "Locked — cover your Emergency, Critical Illness & Burial Funds first"
+        ? (btBurialFundApplies(store.profile) ? "Locked — cover your Emergency, Critical Illness & Burial Funds first" : "Locked — cover your Emergency & Critical Illness Funds first")
         : vaultTarget > 0
           ? (vaultEarned ? "Funded!" : fmtPct(vaultSaved / vaultTarget) + " there")
           : "Active — add a Vacation Vault goal to start tracking"
@@ -639,6 +643,11 @@
       }
     }
     try { localStorage.setItem(seenKey, JSON.stringify(earnedIds)); } catch (e) {}
+  }
+
+  function refreshGoalCategoryOptions() {
+    const goalCategories = BT_CONFIG.GOAL_CATEGORIES.filter((c) => c !== "Burial Fund" || btBurialFundApplies(btLoadStore(btUid).profile));
+    document.getElementById("g-category").innerHTML = goalCategories.map((c) => `<option value="${c}">${c}</option>`).join("");
   }
 
   function renderGoals(store) {
@@ -982,6 +991,7 @@
       document.getElementById("s-currency").value = store.profile?.currency || "TTD";
       document.getElementById("s-target").value = Math.round((store.profile?.annual_savings_target_pct ?? 0.2) * 100);
       document.getElementById("s-dependents").value = store.profile?.dependents_count || 0;
+      document.getElementById("s-dob").value = store.profile?.date_of_birth || "";
       renderFxRatesInputs(store);
       renderBudgetsInputs(store);
     }
@@ -1038,7 +1048,7 @@
     document.getElementById("bt-logout").addEventListener("click", async () => { await btSignOut(); window.location.replace("login.html"); });
 
     if (!readOnly) {
-      document.getElementById("g-category").innerHTML = BT_CONFIG.GOAL_CATEGORIES.map((c) => `<option value="${c}">${c}</option>`).join("");
+      refreshGoalCategoryOptions();
       document.getElementById("b-category").innerHTML = BT_CONFIG.EXPENSE_CATEGORIES.map((c) => `<option value="${c}">${c}</option>`).join("");
 
       const showTipsBox = document.getElementById("s-show-tips");
@@ -1159,6 +1169,7 @@
         const curr = document.getElementById("s-currency").value.trim() || "TTD";
         const pct = Math.max(0, Math.min(100, parseFloat(document.getElementById("s-target").value) || 0)) / 100;
         const dependents_count = Math.max(0, parseInt(document.getElementById("s-dependents").value, 10) || 0);
+        const date_of_birth = document.getElementById("s-dob").value || null;
         const fx_rates = {};
         document.querySelectorAll(".fx-rate-input").forEach((el) => {
           const v = parseFloat(el.value);
@@ -1169,7 +1180,8 @@
           const v = parseFloat(el.value);
           if (v > 0) category_budgets[el.dataset.category] = v;
         });
-        btUpdateProfile(btUid, { full_name, currency: curr, annual_savings_target_pct: pct, dependents_count, fx_rates, category_budgets });
+        btUpdateProfile(btUid, { full_name, currency: curr, annual_savings_target_pct: pct, dependents_count, date_of_birth, fx_rates, category_budgets });
+        refreshGoalCategoryOptions();
         renderAll();
         toast("Settings saved");
       });

@@ -96,22 +96,25 @@
     <p class="prot-note" id="rt-note"></p>
   </div>
 
-  <div class="bt-card">
+  <div class="bt-card" id="bf-card">
     <h2 class="bf-toggle-head" id="bf-toggle" data-tip="Final-expense costs a family faces to organize and pay for a full passing — every line here is your own estimate, adjustable to your situation. Click to expand or collapse the breakdown.">Burial Fund <span class="bf-chevron" id="bf-chevron">▾</span></h2>
-    <p class="bf-range" id="bf-range">—</p>
-    <div class="bf-total">
-      <span>Your estimated total</span>
-      <span class="amt" id="bf-total">—</span>
-    </div>
-    <div id="bf-goal-progress"></div>
-    <div class="bf-detail" id="bf-detail">
-      <div id="bf-items"></div>
-      <button class="bt-btn bt-btn--gold bt-btn--sm" id="bf-save" style="margin-top:16px">Save breakdown</button>
+    <div id="bf-locked-note" class="vv-locked-note" style="display:none">—</div>
+    <div id="bf-unlocked-wrap">
+      <p class="bf-range" id="bf-range">—</p>
+      <div class="bf-total">
+        <span>Your estimated total</span>
+        <span class="amt" id="bf-total">—</span>
+      </div>
+      <div id="bf-goal-progress"></div>
+      <div class="bf-detail" id="bf-detail">
+        <div id="bf-items"></div>
+        <button class="bt-btn bt-btn--gold bt-btn--sm" id="bf-save" style="margin-top:16px">Save breakdown</button>
+      </div>
     </div>
   </div>
 
   <div class="bt-card" id="vv-card">
-    <h2 data-tip="Once your Emergency Fund, Critical Illness Fund, and Burial Fund are all fully funded, this unlocks so you can start setting aside a percentage of your disposable income for a Vacation Vault.">🌴 Vacation Vault</h2>
+    <h2 data-tip="Once your Emergency Fund and Critical Illness Fund (and Burial Fund, from age 50) are fully funded, this unlocks so you can start setting aside a percentage of your disposable income for a Vacation Vault.">🌴 Vacation Vault</h2>
     <div id="vv-locked-note" class="vv-locked-note">🔒 Fully fund your Emergency Fund, Critical Illness Fund, and Burial Fund first — this unlocks once all three are covered.</div>
     <div id="vv-unlocked-note" class="vv-unlocked-note" style="display:none">🔓 Every base is covered — time to start putting something aside for the fun stuff.</div>
     <p class="prot-basis" id="vv-basis">—</p>
@@ -173,6 +176,21 @@
   }
 
   function renderBurialFund(profile, currency) {
+    const minAge = BT_CONFIG.BURIAL_FUND_MIN_AGE;
+    const applies = btBurialFundApplies(profile);
+    const lockedNote = document.getElementById("bf-locked-note");
+    const wrap = document.getElementById("bf-unlocked-wrap");
+    if (!applies) {
+      wrap.style.display = "none";
+      lockedNote.style.display = "";
+      lockedNote.innerHTML = profile?.date_of_birth
+        ? `🔒 Burial Fund planning becomes available at age ${minAge}.`
+        : `🔒 Burial Fund planning becomes available at age ${minAge}. Add your date of birth in <a href="dashboard.html">Settings</a> to unlock this once you're there.`;
+      return;
+    }
+    lockedNote.style.display = "none";
+    wrap.style.display = "";
+
     const range = btBurialFundRange();
     document.getElementById("bf-range").textContent = `Typical range: ${fmtMoney(range.low, currency)} – ${fmtMoney(range.high, currency)}`;
 
@@ -204,6 +222,10 @@
     const card = document.getElementById("vv-card");
     const pctInput = document.getElementById("vv-pct");
     const saveBtn = document.getElementById("vv-save");
+
+    document.getElementById("vv-locked-note").textContent = btBurialFundApplies(profile)
+      ? "🔒 Fully fund your Emergency Fund, Critical Illness Fund, and Burial Fund first — this unlocks once all three are covered."
+      : "🔒 Fully fund your Emergency Fund and Critical Illness Fund first — this unlocks once both are covered.";
 
     const unlocked = btProtectionFullyCovered(store, currency, profile);
     document.getElementById("vv-locked-note").style.display = unlocked ? "none" : "";

@@ -97,7 +97,9 @@ const BT_CONFIG = {
      range each. A client's own adjusted figure (if they've set one) always
      wins; otherwise the midpoint of the range is used as the starting
      estimate. Figures are in the client's own home currency, no FX
-     conversion applied — same treatment as the health-check thresholds. */
+     conversion applied — same treatment as the health-check thresholds.
+     The section itself only applies from BURIAL_FUND_MIN_AGE onward. */
+  BURIAL_FUND_MIN_AGE: 50,
   BURIAL_FUND_ITEMS: [
     { key: "funeral_home", label: "Funeral home / mortuary services", low: 5000, high: 15000 },
     { key: "casket", label: "Casket or urn", low: 2000, high: 20000 },

@@ -876,6 +876,24 @@ function btRetirementMonthlyTarget(store, viewCurrency, profile) {
   };
 }
 
+/** Age in whole years from a "YYYY-MM-DD" date of birth, or null if unset. */
+function btAge(dateOfBirth, today = new Date()) {
+  if (!dateOfBirth) return null;
+  const dob = new Date(dateOfBirth);
+  if (isNaN(dob)) return null;
+  let age = today.getFullYear() - dob.getFullYear();
+  const beforeBirthdayThisYear = (today.getMonth() < dob.getMonth()) || (today.getMonth() === dob.getMonth() && today.getDate() < dob.getDate());
+  if (beforeBirthdayThisYear) age--;
+  return age;
+}
+
+/** Whether the Burial Fund section applies to this client — from BURIAL_FUND_MIN_AGE onward, once their date of birth is known. */
+function btBurialFundApplies(profile) {
+  const age = btAge(profile?.date_of_birth);
+  const minAge = (typeof BT_CONFIG !== "undefined" && BT_CONFIG.BURIAL_FUND_MIN_AGE) || 50;
+  return age != null && age >= minAge;
+}
+
 /** Typical low/high cost range across every Burial Fund line item — the ballpark shown before any per-item adjustment. */
 function btBurialFundRange() {
   const items = (typeof BT_CONFIG !== "undefined" && BT_CONFIG.BURIAL_FUND_ITEMS) || [];
@@ -896,10 +914,13 @@ function btBurialFundTotal(profile) {
 
 /**
  * Whether every base is covered: Emergency Fund, Critical Illness Fund,
- * and Burial Fund each have a linked goal saved at or beyond its target.
- * This is the gate for unlocking the Vacation Vault — Life Insurance and
- * Retirement aren't included here since neither has a trackable "amount
- * saved so far" the way a goal does.
+ * and — for clients 50 and over — Burial Fund each have a linked goal
+ * saved at or beyond its target. This is the gate for unlocking the
+ * Vacation Vault — Life Insurance and Retirement aren't included here
+ * since neither has a trackable "amount saved so far" the way a goal
+ * does. Burial Fund is skipped entirely for clients under the minimum
+ * age (or with no date of birth on file yet), since the section isn't
+ * available to them to fund in the first place.
  */
 function btProtectionFullyCovered(store, viewCurrency, profile) {
   const goals = btGoalProgress(store);
@@ -911,28 +932,30 @@ function btProtectionFullyCovered(store, viewCurrency, profile) {
   };
   const ef = btEmergencyFundTarget(store, viewCurrency, profile?.emergency_fund_months);
   const ci = btCriticalIllnessFundTarget(store, viewCurrency);
+  const bfApplies = btBurialFundApplies(profile);
   const bfTarget = btBurialFundTotal(profile);
-  return isCovered("Emergency Fund", ef.target) && isCovered("Critical Illness Fund", ci.target) && isCovered("Burial Fund", bfTarget);
+  return isCovered("Emergency Fund", ef.target) && isCovered("Critical Illness Fund", ci.target) && (!bfApplies || isCovered("Burial Fund", bfTarget));
 }
 
 /**
  * Combined progress toward unlocking the Vacation Vault — Emergency Fund,
- * Critical Illness Fund, and Burial Fund, saved vs target, added together.
- * Each fund's contribution is capped at its own target so overfunding one
- * can't mask another sitting empty; pct only reaches 100% exactly when
- * btProtectionFullyCovered would also be true.
+ * Critical Illness Fund, and (for clients 50+) Burial Fund, saved vs
+ * target, added together. Each fund's contribution is capped at its own
+ * target so overfunding one can't mask another sitting empty; pct only
+ * reaches 100% exactly when btProtectionFullyCovered would also be true.
  */
 function btVacationVaultUnlockProgress(store, viewCurrency, profile) {
   const goals = btGoalProgress(store);
   const savedIn = (category) => goals.filter((g) => g.category === category).reduce((s, g) => s + g.saved_amount, 0);
   const ef = btEmergencyFundTarget(store, viewCurrency, profile?.emergency_fund_months);
   const ci = btCriticalIllnessFundTarget(store, viewCurrency);
-  const bfTarget = btBurialFundTotal(profile);
   const parts = [
     { category: "Emergency Fund", saved: savedIn("Emergency Fund"), target: ef.target },
-    { category: "Critical Illness Fund", saved: savedIn("Critical Illness Fund"), target: ci.target },
-    { category: "Burial Fund", saved: savedIn("Burial Fund"), target: bfTarget }
+    { category: "Critical Illness Fund", saved: savedIn("Critical Illness Fund"), target: ci.target }
   ];
+  if (btBurialFundApplies(profile)) {
+    parts.push({ category: "Burial Fund", saved: savedIn("Burial Fund"), target: btBurialFundTotal(profile) });
+  }
   const totalSaved = parts.reduce((s, p) => s + Math.min(p.saved, p.target), 0);
   const totalTarget = parts.reduce((s, p) => s + p.target, 0);
   return {
