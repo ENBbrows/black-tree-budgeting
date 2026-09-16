@@ -98,6 +98,34 @@
     </div>
   </div>
 
+  <div class="bt-card" id="settings-card">
+    <h2>Settings</h2>
+    <label data-tip="How you'd like to be greeted on your Dashboard, e.g. &quot;Amii&quot; or &quot;Amii Leroux&quot;.">Full name</label>
+    <input id="s-name" type="text" />
+    <div class="bt-field-row">
+      <div><label data-tip="The currency label shown next to your numbers, e.g. TTD, USD.">Currency</label><input id="s-currency" type="text" maxlength="6" /></div>
+      <div><label data-tip="What percent of your income you're aiming to save each year. 20% is a good target for long-term financial independence.">Annual savings target</label><input id="s-target" type="number" min="0" max="100" step="1" /></div>
+    </div>
+    <label data-tip="How many people your income supports (yourself included) — just a headcount, used to give the Cost of Living figures context. Doesn't affect any calculation.">Dependents</label>
+    <input id="s-dependents" type="number" min="0" step="1" style="max-width:120px" />
+
+    <div id="fx-rates-wrap" style="margin-top:16px;padding-top:14px;border-top:1px dashed var(--bt-border)">
+      <label style="margin:0 0 8px" data-tip="Manual exchange rates for any foreign currency you log income in — set once, updated whenever you like. Nothing is fetched automatically, so this keeps working offline.">Exchange rates</label>
+      <div id="fx-rates-list"></div>
+    </div>
+
+    <div id="budgets-wrap" style="margin-top:16px;padding-top:14px;border-top:1px dashed var(--bt-border)">
+      <label style="margin:0 0 8px" data-tip="Optional monthly ceiling per category. Leave blank for no limit. When you're close to or over one, it'll show up as a flag above and a color on Spending by Category.">Category budgets <span style="font-weight:400;color:var(--bt-muted)">(optional)</span></label>
+      <div id="budgets-list"></div>
+    </div>
+
+    <button class="bt-btn bt-btn--ghost" id="s-save" style="margin-top:14px">Save settings</button>
+
+    <label style="margin-top:20px;display:flex;align-items:center;gap:8px;font-weight:400;color:var(--bt-muted);cursor:pointer">
+      <input type="checkbox" id="s-show-tips" style="width:auto" /> Show help bubbles on form fields
+    </label>
+  </div>
+
   <div class="bt-view-toggle" id="view-toggle">
     <span class="lbl">Display style:</span>
     <button class="bt-btn bt-btn--ghost bt-btn--sm" data-mode="bars" type="button">▬ Bars</button>
@@ -297,34 +325,6 @@
           <button class="bt-btn bt-btn--gold bt-btn--sm" id="advisor-generate">Generate code for advisor</button>
           <button class="bt-btn bt-btn--ghost bt-btn--sm" id="advisor-unlink" style="display:none">Remove advisor access</button>
         </div>
-      </div>
-
-      <div class="bt-card" id="settings-card">
-        <h2>Settings</h2>
-        <label data-tip="How you'd like to be greeted on your Dashboard, e.g. &quot;Amii&quot; or &quot;Amii Leroux&quot;.">Full name</label>
-        <input id="s-name" type="text" />
-        <div class="bt-field-row">
-          <div><label data-tip="The currency label shown next to your numbers, e.g. TTD, USD.">Currency</label><input id="s-currency" type="text" maxlength="6" /></div>
-          <div><label data-tip="What percent of your income you're aiming to save each year. 20% is a good target for long-term financial independence.">Annual savings target</label><input id="s-target" type="number" min="0" max="100" step="1" /></div>
-        </div>
-        <label data-tip="How many people your income supports (yourself included) — just a headcount, used to give the Cost of Living figures context. Doesn't affect any calculation.">Dependents</label>
-        <input id="s-dependents" type="number" min="0" step="1" style="max-width:120px" />
-
-        <div id="fx-rates-wrap" style="margin-top:16px;padding-top:14px;border-top:1px dashed var(--bt-border)">
-          <label style="margin:0 0 8px" data-tip="Manual exchange rates for any foreign currency you log income in — set once, updated whenever you like. Nothing is fetched automatically, so this keeps working offline.">Exchange rates</label>
-          <div id="fx-rates-list"></div>
-        </div>
-
-        <div id="budgets-wrap" style="margin-top:16px;padding-top:14px;border-top:1px dashed var(--bt-border)">
-          <label style="margin:0 0 8px" data-tip="Optional monthly ceiling per category. Leave blank for no limit. When you're close to or over one, it'll show up as a flag above and a color on Spending by Category.">Category budgets <span style="font-weight:400;color:var(--bt-muted)">(optional)</span></label>
-          <div id="budgets-list"></div>
-        </div>
-
-        <button class="bt-btn bt-btn--ghost" id="s-save" style="margin-top:14px">Save settings</button>
-
-        <label style="margin-top:20px;display:flex;align-items:center;gap:8px;font-weight:400;color:var(--bt-muted);cursor:pointer">
-          <input type="checkbox" id="s-show-tips" style="width:auto" /> Show help bubbles on form fields
-        </label>
       </div>
 
       <p class="bt-sub" style="text-align:center"><a href="setup-guide.html">Add these to your home screen →</a></p>
