@@ -36,6 +36,9 @@
   .vv-unlocked-note { font-size: 0.86rem; color: var(--bt-green); margin: 0 0 14px; }
   #vv-card.vv-locked .prot-field-row, #vv-card.vv-locked .prot-target { opacity: 0.45; }
   #vv-card input:disabled, #vv-card button:disabled { cursor: not-allowed; opacity: 0.6; }
+  .ins-setup { margin-bottom: 14px; padding-bottom: 14px; border-bottom: 1px dashed var(--bt-border); }
+  .ins-countdown { font-size: 0.88rem; font-weight: 600; background: var(--bt-cream); border-radius: 10px; padding: 12px 14px; margin: 0 0 14px; }
+  .ins-countdown--urgent { color: var(--bt-red); background: var(--bt-red-bg); }
 </style>
 </head>
 <body>
@@ -127,6 +130,35 @@
     </div>
     <div class="prot-target" id="vv-target">—</div>
     <div id="vv-saved"></div>
+  </div>
+
+  <h2 class="prot-section-head">Insurance Renewals</h2>
+  <p class="bt-sub">Car and property insurance usually come due once a year — track the renewal date here and spread the cost across the months leading up to it instead of finding it all at once.</p>
+
+  <div class="bt-card" id="ins-car-card">
+    <h2 data-tip="Your car insurance's annual premium and renewal date. A countdown appears once you're within a month of renewing, and we'll suggest a monthly amount to set aside so it's covered a week ahead of time.">🚗 Car Insurance</h2>
+    <div class="ins-setup">
+      <div class="bt-field-row">
+        <div><label style="margin:0 0 4px;display:block;font-size:0.82rem">Annual premium</label><input id="ins-car-premium" type="number" min="0" step="0.01" /></div>
+        <div><label style="margin:0 0 4px;display:block;font-size:0.82rem">Renewal date</label><input id="ins-car-date" type="date" /></div>
+      </div>
+      <button class="bt-btn bt-btn--gold bt-btn--sm" id="ins-car-save" style="margin-top:12px">Save</button>
+    </div>
+    <div id="ins-car-countdown" class="ins-countdown" style="display:none"></div>
+    <div id="ins-car-summary"></div>
+  </div>
+
+  <div class="bt-card" id="ins-property-card">
+    <h2 data-tip="Your property insurance's annual premium and renewal date. A countdown appears once you're within a month of renewing, and we'll suggest a monthly amount to set aside so it's covered a week ahead of time.">🏠 Property Insurance</h2>
+    <div class="ins-setup">
+      <div class="bt-field-row">
+        <div><label style="margin:0 0 4px;display:block;font-size:0.82rem">Annual premium</label><input id="ins-property-premium" type="number" min="0" step="0.01" /></div>
+        <div><label style="margin:0 0 4px;display:block;font-size:0.82rem">Renewal date</label><input id="ins-property-date" type="date" /></div>
+      </div>
+      <button class="bt-btn bt-btn--gold bt-btn--sm" id="ins-property-save" style="margin-top:12px">Save</button>
+    </div>
+    <div id="ins-property-countdown" class="ins-countdown" style="display:none"></div>
+    <div id="ins-property-summary"></div>
   </div>
 
   <p class="bt-sub" style="text-align:center;margin-top:24px"><a href="dashboard.html">← Back to Dashboard</a></p>
@@ -254,6 +286,65 @@
     document.getElementById("vv-target").textContent = `${fmtMoney(suggestion.monthlyContribution, currency)}/month suggested`;
   }
 
+  /**
+   * Car/Property Insurance renewal tracking. The countdown banner only
+   * appears once renewal is within a month (or overdue); the suggested
+   * monthly contribution targets having the full premium saved a week
+   * ahead of the renewal date, not on the day itself.
+   */
+  function renderInsuranceRenewal(kind, category, profile, store, currency) {
+    const premium = profile?.[`${kind}_insurance_premium`];
+    const renewalDate = profile?.[`${kind}_insurance_renewal_date`];
+    document.getElementById(`ins-${kind}-premium`).value = premium ?? "";
+    document.getElementById(`ins-${kind}-date`).value = renewalDate || "";
+
+    const countdownEl = document.getElementById(`ins-${kind}-countdown`);
+    const summaryEl = document.getElementById(`ins-${kind}-summary`);
+    countdownEl.style.display = "none";
+
+    if (!premium || !renewalDate) {
+      summaryEl.innerHTML = `<p class="prot-note">Enter your annual premium and renewal date above to start tracking this.</p>`;
+      return;
+    }
+
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const renewal = new Date(renewalDate + "T00:00:00");
+    const daysUntil = Math.round((renewal - today) / 86400000);
+
+    if (daysUntil < 0) {
+      countdownEl.style.display = "";
+      countdownEl.className = "ins-countdown ins-countdown--urgent";
+      countdownEl.textContent = `⚠️ Renewal date (${renewalDate}) has passed — update it once you've renewed.`;
+    } else if (daysUntil <= 30) {
+      countdownEl.style.display = "";
+      countdownEl.className = "ins-countdown" + (daysUntil <= 7 ? " ins-countdown--urgent" : "");
+      countdownEl.textContent = daysUntil === 0 ? "⏰ Renews today!" : `⏰ Renews in ${daysUntil} day${daysUntil === 1 ? "" : "s"} (${renewalDate})`;
+    }
+
+    const target = Number(premium);
+    const linked = btGoalProgress(store).filter((g) => g.category === category);
+    const saved = linked.reduce((s, g) => s + g.saved_amount, 0);
+    const remaining = Math.max(0, target - saved);
+    const daysUntilLead = daysUntil - 7;
+
+    let monthlyNote;
+    if (remaining <= 0) {
+      monthlyNote = `<p class="prot-note" style="color:var(--bt-green)">✅ Fully funded for this renewal.</p>`;
+    } else if (daysUntilLead > 0) {
+      const monthsLeft = Math.max(1, Math.ceil(daysUntilLead / 30));
+      const monthly = remaining / monthsLeft;
+      monthlyNote = `<p class="prot-note">Set aside ${fmtMoney(monthly, currency)}/month to have this fully covered a week before renewal.</p>`;
+    } else {
+      monthlyNote = `<p class="prot-note" style="color:var(--bt-red)">Less than a week of lead time left and ${fmtMoney(remaining, currency)} still needed.</p>`;
+    }
+
+    summaryEl.innerHTML = `
+      <div class="prot-basis">${fmtMoney(target, currency)}/year · renews ${renewalDate}</div>
+      ${goalProgressHtml(store, category, target, currency) || `<p class="prot-note">Add a "${category}" goal from the Dashboard to start tracking what you've saved.</p>`}
+      ${monthlyNote}
+    `;
+  }
+
   function renderAll(store) {
     const profile = store.profile;
     const currency = profile?.currency || "TTD";
@@ -288,6 +379,8 @@
 
     renderBurialFund(profile, currency);
     renderVacationVault(store);
+    renderInsuranceRenewal("car", "Car Insurance", profile, store, currency);
+    renderInsuranceRenewal("property", "Property Insurance", profile, store, currency);
   }
 
   async function init() {
@@ -344,6 +437,19 @@
       store = btLoadStore(btUid);
       renderAll(store);
       toast("Vacation Vault updated");
+    });
+
+    ["car", "property"].forEach((kind) => {
+      document.getElementById(`ins-${kind}-save`).addEventListener("click", () => {
+        const premium = parseFloat(document.getElementById(`ins-${kind}-premium`).value);
+        const renewal_date = document.getElementById(`ins-${kind}-date`).value || null;
+        if (!premium || premium <= 0) return toast("Enter a valid annual premium.");
+        if (!renewal_date) return toast("Pick a renewal date.");
+        btUpdateProfile(btUid, { [`${kind}_insurance_premium`]: premium, [`${kind}_insurance_renewal_date`]: renewal_date });
+        store = btLoadStore(btUid);
+        renderAll(store);
+        toast((kind === "car" ? "Car" : "Property") + " insurance renewal saved");
+      });
     });
 
     if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
