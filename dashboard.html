@@ -426,9 +426,9 @@
     wrap.innerHTML = flags.map((f) => `<div class="bt-flag bt-flag--${f.level}"><span class="dot"></span><span>${f.text}</span></div>`).join("");
   }
 
-  function renderInvestCta(store, summary, flags) {
+  function renderInvestCta(store, summary, flags, debtCtaShown) {
     const card = document.getElementById("invest-cta");
-    if (readOnly) { card.style.display = "none"; return; }
+    if (readOnly || debtCtaShown) { card.style.display = "none"; return; }
     const opp = btInvestmentOpportunity(store, summary, flags);
     if (!opp.eligible) { card.style.display = "none"; return; }
     card.style.display = "";
@@ -440,11 +440,12 @@
       `mailto:${BT_CONFIG.SUPPORT_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   }
 
+  /** Returns whether the card was shown — used to suppress the "invest more" CTA below, since paying down real debt almost always beats investing further. */
   function renderDebtCta(store, summary) {
     const card = document.getElementById("debt-cta");
-    if (readOnly) { card.style.display = "none"; return; }
+    if (readOnly) { card.style.display = "none"; return false; }
     const opp = btDebtPayoffOpportunity(store, summary);
-    if (!opp.eligible) { card.style.display = "none"; return; }
+    if (!opp.eligible) { card.style.display = "none"; return false; }
     card.style.display = "";
     const rateNote = opp.topDebt.interest_rate != null ? ` (${opp.topDebt.interest_rate}% interest)` : "";
     document.getElementById("debt-cta-text").textContent =
@@ -453,6 +454,7 @@
     btn.textContent = `Log a payment toward ${opp.topDebt.debt_name}`;
     btn.dataset.liabilityId = opp.topDebt.id;
     btn.dataset.amount = Math.round(opp.disposable);
+    return true;
   }
 
   function renderStats(elId, period) {
@@ -932,8 +934,8 @@
     const summary = btDashboardSummary(store, viewCurrency);
     const flags = btHealthFlags(store, summary);
     renderFlags(flags);
-    renderDebtCta(store, summary);
-    renderInvestCta(store, summary, flags);
+    const debtCtaShown = renderDebtCta(store, summary);
+    renderInvestCta(store, summary, flags, debtCtaShown);
     renderWeekSpend(summary.periods.week);
     renderStats("stats-month", summary.periods.month);
     renderStats("stats-ytd", summary.periods.ytd);
