@@ -50,6 +50,27 @@ const BT_CONFIG = {
      Income breakdown, not stored per-client — the same split for everyone. */
   ESSENTIAL_CATEGORIES: ["Housing", "Utilities", "Transport", "Food", "Insurance", "Debt Repayment", "Taxes"],
 
+  /* Suggested spend as a % of monthly income per category, plus a Need/
+     Want/Savings tag — informational only, shown as a prompt alongside
+     Category Budgets in Settings. Never pre-fills or enforces a limit;
+     the client still decides whether to type one in at all. Ranges
+     follow standard budgeting guidelines (a 50/30/20-style split, broken
+     out per category) — a starting point, not a rule. Taxes has no
+     typical range since it isn't really a discretionary spending choice. */
+  CATEGORY_BUDGET_GUIDANCE: {
+    "Housing": { type: "need", lowPct: 25, highPct: 35 },
+    "Utilities": { type: "need", lowPct: 5, highPct: 10 },
+    "Transport": { type: "need", lowPct: 10, highPct: 15 },
+    "Food": { type: "need", lowPct: 10, highPct: 15 },
+    "Insurance": { type: "need", lowPct: 5, highPct: 10 },
+    "Debt Repayment": { type: "need", lowPct: 5, highPct: 15 },
+    "Taxes": { type: "need", lowPct: null, highPct: null },
+    "Savings & Investments": { type: "savings", lowPct: 10, highPct: 20 },
+    "Personal": { type: "want", lowPct: 5, highPct: 10 },
+    "Education": { type: "want", lowPct: 5, highPct: 10 },
+    "Other": { type: "want", lowPct: 5, highPct: 10 }
+  },
+
   /* Auto-categorization: as a client types what an expense was for (or a
      scanned bill's text), the first category whose keyword appears in that
      text (case-insensitive) is pre-selected — so the client just describes
