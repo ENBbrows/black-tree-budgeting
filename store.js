@@ -624,6 +624,25 @@ function btEstimateAnnualIncome(store, viewCurrency, today = new Date()) {
   }, 0);
 }
 
+/**
+ * The single annual-income figure every protection/retirement calculation
+ * keys off: the client's own fixed profile.annual_income from Settings
+ * when they've set one, else the year-to-date estimate above. Emergency
+ * Fund, Critical Illness Fund, Life Insurance, and Retirement Target all
+ * call this rather than each picking their own income source, so they
+ * stay consistent with each other and with whatever the client actually
+ * told the app their income is.
+ */
+function btAnnualIncomeBasis(store, viewCurrency, today = new Date()) {
+  const profile = store.profile;
+  const vc = viewCurrency || profile?.currency || "TTD";
+  if (Number(profile?.annual_income) > 0) {
+    const { value } = btConvertAmount(Number(profile.annual_income), profile?.currency || "TTD", vc, profile);
+    return { annualIncome: value, isFixed: true };
+  }
+  return { annualIncome: btEstimateAnnualIncome(store, vc, today), isFixed: false };
+}
+
 /** All figures converted into viewCurrency (defaults to the client's home currency) via their manual fx_rates. */
 function btDashboardSummary(store, viewCurrency, today = new Date()) {
   const profile = store.profile;
@@ -827,53 +846,36 @@ function btInvestmentOpportunity(store, summary, flags) {
    guideline figures to open a conversation with an advisor, never a
    substitute for one. ── */
 
-/** Emergency fund target: months of income (client-set, floor enforced) × estimated monthly income. */
+/** Emergency fund target: months of income (client-set, floor enforced) × the shared annual income basis, monthly. */
 function btEmergencyFundTarget(store, viewCurrency, months, today = new Date()) {
   const min = (typeof BT_CONFIG !== "undefined" && BT_CONFIG.PROTECTION?.emergencyFundMinMonths) || 6;
-  const monthlyIncome = btEstimateAnnualIncome(store, viewCurrency, today) / 12;
+  const basis = btAnnualIncomeBasis(store, viewCurrency, today);
+  const monthlyIncome = basis.annualIncome / 12;
   const m = Math.max(min, Math.round(Number(months) || min));
-  return { monthlyIncome, months: m, target: monthlyIncome * m };
+  return { monthlyIncome, months: m, target: monthlyIncome * m, isFixedIncome: basis.isFixed };
 }
 
-/** Critical illness fund — a step up from the emergency fund: BT_CONFIG.PROTECTION.criticalIllnessAnnualMultiple × annual income. */
+/** Critical illness fund — a step up from the emergency fund: BT_CONFIG.PROTECTION.criticalIllnessAnnualMultiple × the shared annual income basis. */
 function btCriticalIllnessFundTarget(store, viewCurrency, today = new Date()) {
   const multiple = (typeof BT_CONFIG !== "undefined" && BT_CONFIG.PROTECTION?.criticalIllnessAnnualMultiple) || 5;
-  const annualIncome = btEstimateAnnualIncome(store, viewCurrency, today);
-  return { annualIncome, multiple, target: annualIncome * multiple };
+  const basis = btAnnualIncomeBasis(store, viewCurrency, today);
+  return { annualIncome: basis.annualIncome, multiple, target: basis.annualIncome * multiple, isFixedIncome: basis.isFixed };
 }
 
-/** Life insurance coverage guideline — BT_CONFIG.PROTECTION.lifeInsuranceAnnualMultiple × annual income. */
+/** Life insurance coverage guideline — BT_CONFIG.PROTECTION.lifeInsuranceAnnualMultiple × the shared annual income basis. */
 function btLifeInsuranceTarget(store, viewCurrency, today = new Date()) {
   const multiple = (typeof BT_CONFIG !== "undefined" && BT_CONFIG.PROTECTION?.lifeInsuranceAnnualMultiple) || 10;
-  const annualIncome = btEstimateAnnualIncome(store, viewCurrency, today);
-  return { annualIncome, multiple, target: annualIncome * multiple };
+  const basis = btAnnualIncomeBasis(store, viewCurrency, today);
+  return { annualIncome: basis.annualIncome, multiple, target: basis.annualIncome * multiple, isFixedIncome: basis.isFixed };
 }
 
-/**
- * Most recent income entry that looks like a salary (source containing
- * "salary"), falling back to the single most recent income entry of any
- * kind so there's always a best-effort basis. Returns null with nothing
- * logged at all.
- */
-function btFindSalaryIncomeEntry(store) {
-  if (!store.income.length) return null;
-  const sorted = [...store.income].sort((a, b) => (b.entry_date + b.created_at).localeCompare(a.entry_date + a.created_at));
-  const salaryEntries = sorted.filter((e) => (e.source || "").toLowerCase().includes("salary"));
-  return salaryEntries[0] || sorted[0];
-}
-
-/** Retirement monthly payout target — BT_CONFIG.PROTECTION.retirementSalaryReplacementPct of the most recent salary, normalized to a monthly figure regardless of how it was logged (weekly, bi-weekly, etc). */
+/** Retirement monthly payout target — BT_CONFIG.PROTECTION.retirementSalaryReplacementPct of the shared annual income basis, monthly. Null only when there's no fixed income set AND nothing logged to estimate from. */
 function btRetirementMonthlyTarget(store, viewCurrency, profile) {
-  const entry = btFindSalaryIncomeEntry(store);
-  if (!entry) return null;
+  const basis = btAnnualIncomeBasis(store, viewCurrency);
+  if (!(basis.annualIncome > 0)) return null;
   const pct = (typeof BT_CONFIG !== "undefined" && BT_CONFIG.PROTECTION?.retirementSalaryReplacementPct) || 0.75;
-  const monthlyFactor = BT_FREQ_TO_MONTHLY[entry.frequency] ?? 1;
-  const home = profile?.currency || "TTD";
-  const { value: monthlySalary } = btConvertAmount(Number(entry.amount) * monthlyFactor, entry.currency || home, viewCurrency, profile);
-  return {
-    entry, monthlySalary, pct, target: monthlySalary * pct,
-    isExplicitSalary: (entry.source || "").toLowerCase().includes("salary")
-  };
+  const monthlySalary = basis.annualIncome / 12;
+  return { monthlySalary, pct, target: monthlySalary * pct, isFixedIncome: basis.isFixed };
 }
 
 /** Age in whole years from a "YYYY-MM-DD" date of birth, or null if unset. */

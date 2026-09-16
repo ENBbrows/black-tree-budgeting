@@ -80,6 +80,11 @@
     <p class="prot-basis" id="ci-basis">—</p>
     <div class="prot-target" id="ci-target">—</div>
     <div id="ci-goal-progress"></div>
+    <div class="prot-field-row" style="margin-top:14px;margin-bottom:6px">
+      <div><label style="margin:0 0 4px;display:block;font-size:0.82rem" data-tip="Skip the guideline pace and commit to your own monthly amount instead. Leave blank to go back to the automatic guideline.">Your own monthly amount</label><input id="ci-monthly-override" type="number" min="0" step="0.01" /></div>
+      <button class="bt-btn bt-btn--ghost bt-btn--sm" id="ci-monthly-save">Save</button>
+    </div>
+    <p class="prot-note" id="ci-monthly-note"></p>
   </div>
 
   <div class="bt-card">
@@ -87,6 +92,11 @@
     <p class="prot-basis" id="li-basis">—</p>
     <div class="prot-target" id="li-target">—</div>
     <p class="prot-note">Talk to your advisor about a policy that reaches this coverage level.</p>
+    <div class="prot-field-row" style="margin-top:14px;margin-bottom:6px">
+      <div><label style="margin:0 0 4px;display:block;font-size:0.82rem" data-tip="Skip the guideline pace and commit to your own monthly amount instead. Leave blank to go back to the automatic guideline.">Your own monthly amount</label><input id="li-monthly-override" type="number" min="0" step="0.01" /></div>
+      <button class="bt-btn bt-btn--ghost bt-btn--sm" id="li-monthly-save">Save</button>
+    </div>
+    <p class="prot-note" id="li-monthly-note"></p>
   </div>
 
   <h2 class="prot-section-head">Survival Period</h2>
@@ -118,8 +128,9 @@
 
   <div class="bt-card" id="vv-card">
     <h2 data-tip="Once your Emergency Fund and Critical Illness Fund (and Burial Fund, from age 50) are fully funded, this unlocks so you can start setting aside a percentage of your disposable income for a Vacation Vault.">🌴 Vacation Vault</h2>
+    <p class="bt-sub" style="margin-bottom:10px">Your fund for the trip itself — airfare, hotel stays, food, entertainment, day-to-day travel, and gifts or souvenirs — budgeted for ahead of time instead of scrambled together at the last minute.</p>
     <div id="vv-locked-note" class="vv-locked-note">🔒 Fully fund your Emergency Fund, Critical Illness Fund, and Burial Fund first — this unlocks once all three are covered.</div>
-    <div id="vv-unlocked-note" class="vv-unlocked-note" style="display:none">🔓 Every base is covered — time to start putting something aside for the fun stuff.</div>
+    <div id="vv-unlocked-note" class="vv-unlocked-note" style="display:none">🔓 Every base is covered — time to start putting something aside for flights, hotel stays, food, entertainment, travel, and gifts or souvenirs on your next trip.</div>
     <p class="prot-basis" id="vv-basis">—</p>
     <div class="prot-field-row">
       <div>
@@ -270,8 +281,8 @@
     const linked = btGoalProgress(store).filter((g) => g.category === "Vacation Vault");
     const saved = linked.reduce((s, g) => s + g.saved_amount, 0);
     document.getElementById("vv-saved").innerHTML = linked.length
-      ? `<p class="prot-note">${fmtMoney(saved, currency)} saved so far toward your Vacation Vault.</p>`
-      : `<p class="prot-note">Add a "Vacation Vault" goal from the Dashboard to start tracking what you've saved.</p>`;
+      ? `<p class="prot-note">${fmtMoney(saved, currency)} saved so far toward your Vacation Vault — airfare, hotel, food, entertainment, travel, and souvenirs, all covered ahead of time.</p>`
+      : `<p class="prot-note">Add a "Vacation Vault" goal from the Dashboard to start tracking what you've saved toward airfare, hotel stays, food, entertainment, travel, and gifts or souvenirs.</p>`;
 
     if (!unlocked) {
       document.getElementById("vv-basis").textContent = "";
@@ -345,36 +356,62 @@
     `;
   }
 
+  /**
+   * Shared "set your own monthly amount" control for Critical Illness Fund
+   * and Life Insurance — when the client sets a value it overrides the
+   * automatic "target ÷ 12" guideline pace shown otherwise. Doesn't touch
+   * the target/coverage figure itself, only which monthly number is shown
+   * as the plan.
+   */
+  function renderMonthlyOverride(kind, target, currency, overrideValue) {
+    document.getElementById(`${kind}-monthly-override`).value = overrideValue || "";
+    const noteEl = document.getElementById(`${kind}-monthly-note`);
+    if (overrideValue > 0) {
+      noteEl.innerHTML = `<strong>${fmtMoney(overrideValue, currency)}/month</strong> — your own amount, overriding the automatic guideline.`;
+    } else {
+      const suggested = target / 12;
+      noteEl.textContent = `Guideline pace: ${fmtMoney(suggested, currency)}/month to build this within a year.`;
+    }
+  }
+
   function renderAll(store) {
     const profile = store.profile;
     const currency = profile?.currency || "TTD";
 
     const ef = btEmergencyFundTarget(store, currency, profile?.emergency_fund_months);
     document.getElementById("ef-months").value = ef.months;
-    document.getElementById("ef-basis").textContent = `Based on an estimated monthly income of ${fmtMoney(ef.monthlyIncome, currency)}.`;
+    document.getElementById("ef-basis").textContent = ef.isFixedIncome
+      ? `Based on your annual income set in Settings — ${fmtMoney(ef.monthlyIncome, currency)}/month.`
+      : `Based on an estimated monthly income of ${fmtMoney(ef.monthlyIncome, currency)} from your logged income.`;
     document.getElementById("ef-target").textContent = `${fmtMoney(ef.target, currency)} target`;
     document.getElementById("ef-goal-progress").innerHTML = goalProgressHtml(store, "Emergency Fund", ef.target, currency);
 
     const ci = btCriticalIllnessFundTarget(store, currency);
-    document.getElementById("ci-basis").textContent = `${ci.multiple}× your estimated annual income of ${fmtMoney(ci.annualIncome, currency)}.`;
+    document.getElementById("ci-basis").textContent = ci.isFixedIncome
+      ? `${ci.multiple}× your annual income of ${fmtMoney(ci.annualIncome, currency)}, set in Settings.`
+      : `${ci.multiple}× your estimated annual income of ${fmtMoney(ci.annualIncome, currency)}.`;
     document.getElementById("ci-target").textContent = `${fmtMoney(ci.target, currency)} target`;
     document.getElementById("ci-goal-progress").innerHTML = goalProgressHtml(store, "Critical Illness Fund", ci.target, currency);
+    renderMonthlyOverride("ci", ci.target, currency, profile?.critical_illness_monthly_override);
 
     const li = btLifeInsuranceTarget(store, currency);
-    document.getElementById("li-basis").textContent = `${li.multiple}× your estimated annual income of ${fmtMoney(li.annualIncome, currency)}.`;
+    document.getElementById("li-basis").textContent = li.isFixedIncome
+      ? `${li.multiple}× your annual income of ${fmtMoney(li.annualIncome, currency)}, set in Settings.`
+      : `${li.multiple}× your estimated annual income of ${fmtMoney(li.annualIncome, currency)}.`;
     document.getElementById("li-target").textContent = `${fmtMoney(li.target, currency)} target coverage`;
+    renderMonthlyOverride("li", li.target, currency, profile?.life_insurance_monthly_override);
 
     const rt = btRetirementMonthlyTarget(store, currency, profile);
     if (!rt) {
-      document.getElementById("rt-basis").textContent = "Log some income first to see a retirement target here.";
+      document.getElementById("rt-basis").textContent = "Log some income, or set a fixed annual income in Settings, to see a retirement target here.";
       document.getElementById("rt-target").textContent = "—";
       document.getElementById("rt-note").textContent = "";
     } else {
-      document.getElementById("rt-basis").textContent = `${Math.round(rt.pct * 100)}% of your most recent salary, ${fmtMoney(rt.monthlySalary, currency)}/month.`;
+      document.getElementById("rt-basis").textContent = `${Math.round(rt.pct * 100)}% of your monthly income, ${fmtMoney(rt.monthlySalary, currency)}/month.`;
       document.getElementById("rt-target").textContent = `${fmtMoney(rt.target, currency)}/month target payout`;
-      document.getElementById("rt-note").textContent = rt.isExplicitSalary
-        ? `Based on "${rt.entry.source}" logged ${rt.entry.entry_date}.`
-        : `No income source labeled "Salary" was found — using your most recent income entry, "${rt.entry.source}" (${rt.entry.entry_date}), as a stand-in. Log income with "Salary" in the source for a more precise figure.`;
+      document.getElementById("rt-note").textContent = rt.isFixedIncome
+        ? "Based on the annual income you set in Settings."
+        : "Based on an estimate from your logged income — set a fixed annual income in Settings for a stable figure that won't shift as you log more.";
     }
 
     renderBurialFund(profile, currency);
@@ -404,6 +441,17 @@
     });
 
     btWireScanFab("scan-fab-btn", "scan-fab-file");
+
+    [["ci", "critical_illness_monthly_override", "Critical Illness"], ["li", "life_insurance_monthly_override", "Life Insurance"]].forEach(([kind, field, label]) => {
+      document.getElementById(`${kind}-monthly-save`).addEventListener("click", () => {
+        const raw = document.getElementById(`${kind}-monthly-override`).value;
+        const val = parseFloat(raw);
+        btUpdateProfile(btUid, { [field]: val > 0 ? val : null });
+        store = btLoadStore(btUid);
+        renderAll(store);
+        toast(val > 0 ? `${label} monthly amount saved` : `${label} back to the automatic guideline`);
+      });
+    });
 
     document.getElementById("ef-save").addEventListener("click", () => {
       const min = BT_CONFIG.PROTECTION.emergencyFundMinMonths;
