@@ -314,19 +314,6 @@
         <p class="bt-sub" id="col-note" style="margin:10px 0 0"></p>
       </div>
 
-      <div class="bt-card" id="advisor-card" style="display:none">
-        <h2 data-tip="Only you can connect your account to a Black Tree advisor. Generate a one-time code and hand it to them directly — they need both your email and that code to complete the link. Remove their access whenever you like.">My Advisor</h2>
-        <p class="bt-sub" id="advisor-status" style="margin-bottom:10px">—</p>
-        <div id="advisor-code-wrap" style="display:none;margin-bottom:14px">
-          <div style="font-family:var(--bt-font-head);font-size:1.8rem;letter-spacing:0.12em;text-align:center;padding:14px;background:var(--bt-cream);border-radius:10px" id="advisor-code"></div>
-          <p class="bt-sub" id="advisor-code-note" style="text-align:center;margin:8px 0 0"></p>
-        </div>
-        <div style="display:flex;gap:10px;flex-wrap:wrap">
-          <button class="bt-btn bt-btn--gold bt-btn--sm" id="advisor-generate">Generate code for advisor</button>
-          <button class="bt-btn bt-btn--ghost bt-btn--sm" id="advisor-unlink" style="display:none">Remove advisor access</button>
-        </div>
-      </div>
-
       <p class="bt-sub" style="text-align:center"><a href="setup-guide.html">Add these to your home screen →</a></p>
       <p class="bt-sub" style="text-align:center"><a href="privacy.html">🔒 Privacy &amp; security →</a></p>
     </div>
@@ -988,7 +975,6 @@
     renderPaymentBreakdown(store);
     renderCurrencyBreakdown(store);
 
-    renderAdvisorCard(store);
     renderSetupPasswordCard(store);
 
     if (!readOnly) {
@@ -1006,18 +992,6 @@
     const hasPassword = !!store.profile?.has_password;
     const dismissed = sessionStorage.getItem("bt-setpw-dismissed") === "1";
     card.style.display = (!readOnly && !hasPassword && !dismissed) ? "" : "none";
-  }
-
-  function renderAdvisorCard(store) {
-    const card = document.getElementById("advisor-card");
-    const role = store.profile?.role || "client";
-    if (readOnly || role !== "client") { card.style.display = "none"; return; }
-    card.style.display = "";
-    const linked = !!store.profile?.agent_id;
-    document.getElementById("advisor-status").textContent = linked
-      ? "An advisor currently has read-only access to your numbers."
-      : "No advisor is linked to your account yet.";
-    document.getElementById("advisor-unlink").style.display = linked ? "" : "none";
   }
 
   function setReadOnly() {
@@ -1133,27 +1107,6 @@
           statusEl.className = "err";
         }
         saveBtn.disabled = false; saveBtn.textContent = "Set password";
-      });
-
-      document.getElementById("advisor-generate").addEventListener("click", async () => {
-        if (!navigator.onLine) return toast("You need a connection to generate a code.");
-        const { data, error } = await btSupabase.rpc("bt_generate_link_code");
-        if (error || !data?.ok) return toast("Couldn't generate a code — try again.");
-        document.getElementById("advisor-code-wrap").style.display = "";
-        document.getElementById("advisor-code").textContent = data.code;
-        const mins = Math.max(1, Math.round((new Date(data.expires_at) - new Date()) / 60000));
-        document.getElementById("advisor-code-note").textContent = `Share this with your advisor — expires in ${mins} minutes, one-time use.`;
-      });
-
-      document.getElementById("advisor-unlink").addEventListener("click", async () => {
-        if (!navigator.onLine) return toast("You need a connection to remove advisor access.");
-        const { error } = await btSupabase.rpc("bt_client_unlink_agent");
-        if (error) return toast("Couldn't remove advisor access — try again.");
-        const s = btLoadStore(btUid);
-        if (s.profile) s.profile.agent_id = null;
-        btSaveStore(btUid, s);
-        toast("Advisor access removed");
-        renderAll();
       });
 
       document.getElementById("b-submit").addEventListener("click", () => {
