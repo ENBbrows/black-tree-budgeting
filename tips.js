@@ -56,21 +56,26 @@
   }
 
   function init() {
+    // Deliberately not wired to a field's own "focus" — a bubble that pops
+    // up just from typing into a field (rather than being asked for) can
+    // reposition above a cramped field near the bottom of a form and end
+    // up covering whatever's below it (a file picker, a submit button),
+    // swallowing the next tap entirely. Hover and an explicit tap on the
+    // label/"?" are asks; focus-to-type isn't.
     document.querySelectorAll("label[data-tip]").forEach((label) => {
-      const forId = label.getAttribute("for");
-      const field = forId ? document.getElementById(forId) : label.nextElementSibling;
-
       label.addEventListener("click", (e) => { e.preventDefault(); showBubble(label, label); });
       label.addEventListener("mouseenter", () => showBubble(label, label));
-
-      if (field) {
-        field.addEventListener("focus", () => showBubble(label, field));
-      }
     });
 
     document.addEventListener("click", (e) => {
       if (!e.target.closest(".bt-tip-bubble") && !e.target.closest("label[data-tip]")) closeBubble();
     });
+    // Moving focus anywhere — tabbing on, typing into the next field —
+    // closes a bubble left open from a label tap/hover, so it never lingers
+    // over whatever the user interacts with next.
+    document.addEventListener("focusin", (e) => {
+      if (!e.target.closest(".bt-tip-bubble")) closeBubble();
+    }, true);
     window.addEventListener("scroll", closeBubble, true);
   }
 

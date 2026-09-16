@@ -75,6 +75,9 @@
       </div>
     </div>
 
+    <label for="lib-file">Attach bank transfer screenshot <span style="font-weight:400;color:var(--bt-muted)">(optional — saved to your private Document Library)</span></label>
+    <input id="lib-file" type="file" accept="image/*" capture="environment" />
+
     <button class="bt-btn bt-btn--gold" id="f-submit" style="margin-top:18px">Save income</button>
   </div>
 
@@ -90,6 +93,7 @@
 <nav class="bt-bottom-nav">
   <a href="income.html" class="active">Income</a>
   <a href="expense.html">Expense</a>
+  <a href="library.html">Library</a>
   <a href="dashboard.html">Dashboard</a>
 </nav>
 
@@ -199,10 +203,24 @@
 
       if (payment_type) localStorage.setItem("bt_last_income_payment_type", payment_type);
 
+      const libFile = document.getElementById("lib-file").files[0];
+      if (libFile) {
+        if (navigator.onLine) {
+          btUploadDocument(btUid, libFile, {
+            doc_type: "bank_transfer", bank_name: payment_account, category: null,
+            amount, doc_date: entry_date, notes: source, income_id: null, expense_id: null
+          }).then(() => toast("Screenshot saved to Document Library"))
+            .catch(() => toast("Income saved, but the screenshot didn't upload — try adding it from the Document Library."));
+        } else {
+          toast("Income saved offline — attach the screenshot from the Document Library once you're back online.");
+        }
+      }
+
       document.getElementById("f-source").value = "";
       document.getElementById("f-amount").value = "";
       document.getElementById("f-notes").value = "";
       document.getElementById("f-payment-account").value = "";
+      document.getElementById("lib-file").value = "";
     });
 
     if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});

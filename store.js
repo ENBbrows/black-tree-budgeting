@@ -407,6 +407,103 @@ function btWireScanFab(btnId, fileId) {
   });
 }
 
+/* ── Document Library — private accounting records (bank-transfer
+   screenshots, bill/receipt photos) kept in the "bt-documents" Storage
+   bucket, one file per bt_documents row. The bucket is private; every
+   read goes through a short-lived signed URL rather than a public
+   link, and every object's path is prefixed with the owner's uid so
+   Storage's own RLS policies enforce that only they can reach it. ── */
+
+function btDocStoragePath(uid, docId, file) {
+  const rawExt = (file.name || "").split(".").pop() || "jpg";
+  const ext = rawExt.toLowerCase().replace(/[^a-z0-9]/g, "") || "jpg";
+  return `${uid}/${docId}.${ext}`;
+}
+
+/** Uploads a document image and inserts its metadata row. meta: {doc_type, bank_name, category, amount, doc_date, notes, income_id, expense_id}. Rolls back the upload if the row insert fails. */
+async function btUploadDocument(uid, file, meta) {
+  const docId = self.crypto?.randomUUID ? crypto.randomUUID() : "doc-" + Date.now() + "-" + Math.random().toString(36).slice(2);
+  const path = btDocStoragePath(uid, docId, file);
+  const { error: uploadError } = await btSupabase.storage.from("bt-documents").upload(path, file, { upsert: false, contentType: file.type || "image/jpeg" });
+  if (uploadError) throw uploadError;
+  const row = { id: docId, user_id: uid, storage_path: path, ...meta };
+  const { data, error } = await btSupabase.from("bt_documents").insert(row).select().single();
+  if (error) {
+    await btSupabase.storage.from("bt-documents").remove([path]).catch(() => {});
+    throw error;
+  }
+  return data;
+}
+
+/** Every document row for this user — small metadata only, so sorting/filtering/grouping happens client-side against the full list. */
+async function btListDocuments(uid) {
+  const { data, error } = await btSupabase.from("bt_documents").select("*").eq("user_id", uid).order("doc_date", { ascending: false });
+  if (error) throw error;
+  return data || [];
+}
+
+async function btDeleteDocument(doc) {
+  await btSupabase.storage.from("bt-documents").remove([doc.storage_path]).catch(() => {});
+  const { error } = await btSupabase.from("bt_documents").delete().eq("id", doc.id);
+  if (error) throw error;
+}
+
+/** Short-lived (1hr) signed URLs for a batch of documents, keyed by storage_path — the only way to actually view an image, since the bucket is private. */
+async function btDocumentSignedUrls(paths) {
+  if (!paths.length) return {};
+  const { data, error } = await btSupabase.storage.from("bt-documents").createSignedUrls(paths, 3600);
+  if (error || !data) return {};
+  const map = {};
+  data.forEach((d, i) => { if (d.signedUrl) map[d.path || paths[i]] = d.signedUrl; });
+  return map;
+}
+
+/** Sorts a document list by the chosen key — returns a new array, never mutates the input. */
+function btSortDocuments(docs, sortBy) {
+  const list = docs.slice();
+  const byDateDesc = (a, b) => b.doc_date.localeCompare(a.doc_date);
+  switch (sortBy) {
+    case "bank_asc": return list.sort((a, b) => (a.bank_name || "").localeCompare(b.bank_name || "") || byDateDesc(a, b));
+    case "date_asc": return list.sort((a, b) => a.doc_date.localeCompare(b.doc_date));
+    case "datetime_desc": return list.sort((a, b) => (b.created_at || "").localeCompare(a.created_at || ""));
+    case "datetime_asc": return list.sort((a, b) => (a.created_at || "").localeCompare(b.created_at || ""));
+    case "price_desc": return list.sort((a, b) => (Number(b.amount) || 0) - (Number(a.amount) || 0));
+    case "price_asc": return list.sort((a, b) => (Number(a.amount) || 0) - (Number(b.amount) || 0));
+    case "category_asc": return list.sort((a, b) => (a.category || "").localeCompare(b.category || "") || byDateDesc(a, b));
+    case "date_desc":
+    default:
+      return list.sort(byDateDesc);
+  }
+}
+
+/** Groups an already-sorted document list by the chosen key, preserving each group's internal order. Returns [{label, docs}], groups in first-seen order. */
+function btGroupDocuments(docs, groupBy) {
+  if (groupBy === "none" || !groupBy) return [{ label: null, docs }];
+  const keyOf = (d) => {
+    if (groupBy === "bank") return d.bank_name || "No bank listed";
+    if (groupBy === "category") return d.category || "Uncategorized";
+    if (groupBy === "month") {
+      const dt = new Date(d.doc_date + "T00:00:00");
+      return dt.toLocaleString(undefined, { month: "long", year: "numeric" });
+    }
+    if (groupBy === "week") {
+      const dt = new Date(d.doc_date + "T00:00:00");
+      const weekStart = new Date(dt);
+      weekStart.setDate(dt.getDate() - dt.getDay());
+      return "Week of " + weekStart.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+    }
+    return "";
+  };
+  const order = [];
+  const groups = {};
+  docs.forEach((d) => {
+    const key = keyOf(d);
+    if (!groups[key]) { groups[key] = []; order.push(key); }
+    groups[key].push(d);
+  });
+  return order.map((label) => ({ label, docs: groups[label] }));
+}
+
 /** Currencies a client can pick from: their home currency first, then the configured extras. */
 function btCurrencyOptions(profile) {
   const home = profile?.currency || "TTD";

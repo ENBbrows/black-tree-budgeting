@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Document Library — Black Tree</title>
+<link rel="apple-touch-icon" href="assets/icon-180.png">
+<link rel="icon" href="assets/icon-32.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#FAF7F2">
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="theme.css" />
+<style>
+  .bt-mini-form { display:none; }
+  .bt-mini-form.show { display:block; }
+  .lib-toolbar { display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; margin-bottom: 14px; }
+  .lib-toolbar .field { flex: 1; min-width: 150px; }
+  .lib-toolbar label { margin: 0 0 4px; font-size: 0.78rem; }
+  .lib-chip-row { display:flex; gap:8px; flex-wrap:wrap; margin-bottom: 14px; }
+  .lib-chip { font-family: var(--bt-font-body); font-size: 0.82rem; font-weight:600; cursor:pointer; padding: 7px 14px; border-radius: 999px; border: 1.5px solid var(--bt-border); background: transparent; color: var(--bt-ink); }
+  .lib-chip.active { background: var(--bt-gold); border-color: var(--bt-gold); color: var(--bt-ink); }
+  .lib-group-head { font-family: var(--bt-font-head); font-size: 1.05rem; font-weight: 700; margin: 26px 0 10px; }
+  .lib-group-head:first-of-type { margin-top: 6px; }
+  .lib-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 14px; }
+  .lib-card { background: var(--bt-white); border: 1px solid var(--bt-border); border-radius: var(--bt-radius); overflow: hidden; box-shadow: var(--bt-shadow); }
+  .lib-thumb { width: 100%; aspect-ratio: 4/3; background: var(--bt-cream); display:flex; align-items:center; justify-content:center; overflow:hidden; cursor:pointer; }
+  .lib-thumb img { width: 100%; height: 100%; object-fit: cover; }
+  .lib-thumb .placeholder { font-size: 1.8rem; color: var(--bt-border); }
+  .lib-card-body { padding: 10px 12px 12px; }
+  .lib-card-body .amt { font-family: var(--bt-font-head); font-weight: 700; font-size: 1rem; }
+  .lib-card-body .tag { display:inline-block; font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.03em; padding: 2px 7px; border-radius: 999px; background: var(--bt-cream); color: var(--bt-muted); margin-bottom: 5px; }
+  .lib-card-body .meta { font-size: 0.76rem; color: var(--bt-muted); margin-top: 3px; line-height: 1.4; }
+  .lib-card-body .row { display:flex; justify-content:space-between; align-items:center; margin-top:8px; }
+  .lib-card-body .del-btn { background:none; border:none; color: var(--bt-red); font-size: 0.74rem; cursor:pointer; padding: 0; font-family: var(--bt-font-body); font-weight: 600; }
+  #lib-viewer { display:none; position:fixed; inset:0; background:rgba(34,30,31,0.85); z-index:60; align-items:center; justify-content:center; padding: 24px; }
+  #lib-viewer.show { display:flex; }
+  #lib-viewer img { max-width: 100%; max-height: 100%; border-radius: 8px; }
+  #lib-viewer .close-btn { position:absolute; top:18px; right:18px; background: var(--bt-white); border:none; border-radius:50%; width:38px; height:38px; font-size:1.2rem; cursor:pointer; }
+</style>
+</head>
+<body>
+<div class="bt-header bt-header--row">
+  <div class="bt-brand">
+    <img src="assets/emblem-gold.png" alt="" style="height:32px">
+    <img src="assets/wordmark-gold.png" alt="Black Tree Investments" style="height:28px">
+  </div>
+  <a href="dashboard.html" class="bt-btn bt-btn--ghost bt-btn--sm" style="text-decoration:none">← Dashboard</a>
+</div>
+
+<div class="bt-container bt-container--wide">
+  <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:6px">
+    <h1>Document Library</h1>
+    <button class="bt-btn bt-btn--gold" id="toggle-upload-form" style="width:auto">+ Add Document</button>
+  </div>
+  <p class="bt-sub">Bank-transfer screenshots and bill or receipt photos, kept for your own accounting and proof of payment. Private to you — stored securely, never shared, not even with a linked advisor.</p>
+
+  <div class="bt-card bt-mini-form" id="upload-form" style="margin-bottom:20px">
+    <label for="u-type">Document type</label>
+    <select id="u-type">
+      <option value="bank_transfer">Bank transfer screenshot</option>
+      <option value="bill">Bill / receipt photo</option>
+      <option value="other">Other</option>
+    </select>
+
+    <div id="u-bank-wrap">
+      <label for="u-bank" data-tip="Which bank this transfer is from or to — the library groups and sorts by this.">Bank</label>
+      <input id="u-bank" type="text" list="bank-suggestions" placeholder="e.g. Republic Bank" />
+      <datalist id="bank-suggestions"></datalist>
+    </div>
+
+    <div id="u-category-wrap" style="display:none">
+      <label for="u-category">Category</label>
+      <select id="u-category"></select>
+    </div>
+
+    <div class="bt-field-row">
+      <div><label for="u-amount">Amount <span style="font-weight:400;color:var(--bt-muted)">(optional)</span></label><input id="u-amount" type="number" min="0" step="0.01" placeholder="0.00" /></div>
+      <div><label for="u-date">Date</label><input id="u-date" type="date" /></div>
+    </div>
+
+    <label for="u-notes">Notes <span style="font-weight:400;color:var(--bt-muted)">(optional)</span></label>
+    <input id="u-notes" type="text" placeholder="e.g. Rent payment to landlord" />
+
+    <label for="u-file">Photo</label>
+    <input id="u-file" type="file" accept="image/*" capture="environment" />
+
+    <button class="bt-btn bt-btn--gold" id="u-submit" style="margin-top:16px">Save to library</button>
+    <div id="u-status" style="font-size:0.85rem;margin-top:8px;min-height:1.2em"></div>
+  </div>
+
+  <div class="bt-card">
+    <div class="lib-toolbar">
+      <div class="field">
+        <label for="lib-group">Group by</label>
+        <select id="lib-group">
+          <option value="none">No grouping</option>
+          <option value="bank">Bank (alphabetical)</option>
+          <option value="month">Month</option>
+          <option value="week">Week</option>
+          <option value="category">Category</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="lib-sort">Sort by</label>
+        <select id="lib-sort">
+          <option value="date_desc">Date — newest first</option>
+          <option value="date_asc">Date — oldest first</option>
+          <option value="datetime_desc">Date &amp; time — newest first</option>
+          <option value="datetime_asc">Date &amp; time — oldest first</option>
+          <option value="price_desc">Price — highest first</option>
+          <option value="price_asc">Price — lowest first</option>
+          <option value="bank_asc">Bank — A to Z</option>
+          <option value="category_asc">Category — A to Z</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="lib-category-filter">Category filter</label>
+        <select id="lib-category-filter"><option value="">All categories</option></select>
+      </div>
+      <div class="field">
+        <label for="lib-bank-filter">Bank filter</label>
+        <input id="lib-bank-filter" type="text" placeholder="Search by bank…" />
+      </div>
+    </div>
+
+    <div class="lib-chip-row" id="lib-type-chips">
+      <button class="lib-chip active" data-type="">All documents</button>
+      <button class="lib-chip" data-type="bank_transfer">Bank transfers</button>
+      <button class="lib-chip" data-type="bill">Bills</button>
+      <button class="lib-chip" data-type="other">Other</button>
+    </div>
+
+    <div id="lib-results"><div class="bt-empty">Loading…</div></div>
+  </div>
+</div>
+
+<div id="lib-viewer"><button class="close-btn" id="lib-viewer-close">&times;</button><img id="lib-viewer-img" src="" alt="" /></div>
+
+<div class="bt-toast" id="bt-toast"></div>
+
+<nav class="bt-bottom-nav">
+  <a href="income.html">Income</a>
+  <a href="expense.html">Expense</a>
+  <a href="library.html" class="active">Library</a>
+  <a href="dashboard.html">Dashboard</a>
+</nav>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="config.js"></script>
+<script src="auth.js"></script>
+<script src="store.js"></script>
+<script src="tips.js"></script>
+<script>
+  let btUid = null;
+  let allDocs = [];
+  let typeFilter = "";
+
+  function toast(msg) {
+    const el = document.getElementById("bt-toast");
+    el.textContent = msg; el.classList.add("show");
+    clearTimeout(toast._t); toast._t = setTimeout(() => el.classList.remove("show"), 2600);
+  }
+
+  function fmtMoney(n, currency) {
+    if (n == null || n === "") return "";
+    return currency + " " + Number(n).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+  }
+
+  function docSubtitle(d) {
+    if (d.doc_type === "bank_transfer") return d.bank_name ? `🏦 ${d.bank_name}` : "🏦 Bank transfer";
+    if (d.doc_type === "bill") return d.category ? `🧾 ${d.category}` : "🧾 Bill";
+    return "📄 Other";
+  }
+
+  function bankSuggestions() {
+    const names = new Set();
+    allDocs.forEach((d) => { if (d.bank_name) names.add(d.bank_name); });
+    return [...names];
+  }
+
+  function updateBankDatalist() {
+    document.getElementById("bank-suggestions").innerHTML = bankSuggestions().map((n) => `<option value="${btEscapeHtml(n)}">`).join("");
+  }
+
+  function updateCategoryFilterOptions() {
+    const sel = document.getElementById("lib-category-filter");
+    const current = sel.value;
+    sel.innerHTML = '<option value="">All categories</option>' + BT_CONFIG.EXPENSE_CATEGORIES.map((c) => `<option value="${c}">${c}</option>`).join("");
+    if ([...sel.options].some((o) => o.value === current)) sel.value = current;
+  }
+
+  function filteredSortedGroupedDocs(currency) {
+    const catFilter = document.getElementById("lib-category-filter").value;
+    const bankFilter = document.getElementById("lib-bank-filter").value.trim().toLowerCase();
+    let list = allDocs.filter((d) => {
+      if (typeFilter && d.doc_type !== typeFilter) return false;
+      if (catFilter && d.category !== catFilter) return false;
+      if (bankFilter && !(d.bank_name || "").toLowerCase().includes(bankFilter)) return false;
+      return true;
+    });
+    list = btSortDocuments(list, document.getElementById("lib-sort").value);
+    return btGroupDocuments(list, document.getElementById("lib-group").value);
+  }
+
+  async function renderResults() {
+    const wrap = document.getElementById("lib-results");
+    const currency = (btLoadStore(btUid).profile?.currency) || "TTD";
+    const groups = filteredSortedGroupedDocs(currency);
+    const total = groups.reduce((s, g) => s + g.docs.length, 0);
+    if (!total) {
+      wrap.innerHTML = allDocs.length
+        ? '<div class="bt-empty">No documents match those filters.</div>'
+        : '<div class="bt-empty">No documents saved yet — add your first bank transfer screenshot or bill photo above.</div>';
+      return;
+    }
+
+    wrap.innerHTML = groups.map((g) => `
+      ${g.label ? `<div class="lib-group-head">${btEscapeHtml(g.label)}</div>` : ""}
+      <div class="lib-grid">
+        ${g.docs.map((d) => `
+          <div class="lib-card" data-id="${d.id}">
+            <div class="lib-thumb" data-path="${btEscapeHtml(d.storage_path)}"><span class="placeholder">📄</span></div>
+            <div class="lib-card-body">
+              <div class="tag">${btEscapeHtml(docSubtitle(d))}</div>
+              ${d.amount != null ? `<div class="amt">${fmtMoney(d.amount, currency)}</div>` : ""}
+              <div class="meta">${d.doc_date}${d.notes ? " · " + btEscapeHtml(d.notes) : ""}</div>
+              <div class="row">
+                <span></span>
+                <button class="del-btn" data-del="${d.id}">Delete</button>
+              </div>
+            </div>
+          </div>
+        `).join("")}
+      </div>
+    `).join("");
+
+    // Load thumbnails via signed URLs, in one batch.
+    const paths = groups.flatMap((g) => g.docs.map((d) => d.storage_path));
+    const urls = await btDocumentSignedUrls(paths);
+    wrap.querySelectorAll(".lib-thumb").forEach((el) => {
+      const url = urls[el.dataset.path];
+      if (url) el.innerHTML = `<img src="${url}" alt="" loading="lazy">`;
+    });
+
+    wrap.querySelectorAll(".lib-thumb").forEach((el) => {
+      el.addEventListener("click", () => {
+        const url = urls[el.dataset.path];
+        if (!url) return;
+        document.getElementById("lib-viewer-img").src = url;
+        document.getElementById("lib-viewer").classList.add("show");
+      });
+    });
+    wrap.querySelectorAll("[data-del]").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        if (!navigator.onLine) return toast("You need a connection to delete a document.");
+        const doc = allDocs.find((d) => d.id === btn.dataset.del);
+        if (!doc) return;
+        if (!confirm("Delete this document? This can't be undone.")) return;
+        try {
+          await btDeleteDocument(doc);
+          allDocs = allDocs.filter((d) => d.id !== doc.id);
+          renderResults();
+          toast("Document deleted");
+        } catch (err) {
+          toast("Couldn't delete — try again.");
+        }
+      });
+    });
+  }
+
+  function updateUploadFormFields() {
+    const type = document.getElementById("u-type").value;
+    document.getElementById("u-bank-wrap").style.display = type === "bank_transfer" ? "" : "none";
+    document.getElementById("u-category-wrap").style.display = type === "bill" ? "" : "none";
+  }
+
+  async function init() {
+    const user = await btRequireAuth();
+    if (!user) return;
+    btUid = window.btCurrentUserId = user.id;
+
+    document.getElementById("u-date").value = new Date().toISOString().slice(0, 10);
+    document.getElementById("u-category").innerHTML = BT_CONFIG.EXPENSE_CATEGORIES.map((c) => `<option value="${c}">${c}</option>`).join("");
+    updateCategoryFilterOptions();
+    updateUploadFormFields();
+    document.getElementById("u-type").addEventListener("change", updateUploadFormFields);
+
+    document.getElementById("toggle-upload-form").addEventListener("click", () => document.getElementById("upload-form").classList.toggle("show"));
+
+    try {
+      allDocs = await btListDocuments(btUid);
+    } catch (e) {
+      allDocs = [];
+      document.getElementById("lib-results").innerHTML = '<div class="bt-empty">Couldn\'t load your documents — check your connection and try again.</div>';
+    }
+    updateBankDatalist();
+    renderResults();
+
+    document.getElementById("lib-group").addEventListener("change", renderResults);
+    document.getElementById("lib-sort").addEventListener("change", renderResults);
+    document.getElementById("lib-category-filter").addEventListener("change", renderResults);
+    document.getElementById("lib-bank-filter").addEventListener("input", renderResults);
+    document.querySelectorAll("#lib-type-chips .lib-chip").forEach((chip) => {
+      chip.addEventListener("click", () => {
+        document.querySelectorAll("#lib-type-chips .lib-chip").forEach((c) => c.classList.remove("active"));
+        chip.classList.add("active");
+        typeFilter = chip.dataset.type;
+        renderResults();
+      });
+    });
+
+    document.getElementById("lib-viewer-close").addEventListener("click", () => document.getElementById("lib-viewer").classList.remove("show"));
+    document.getElementById("lib-viewer").addEventListener("click", (e) => { if (e.target.id === "lib-viewer") document.getElementById("lib-viewer").classList.remove("show"); });
+
+    document.getElementById("u-submit").addEventListener("click", async () => {
+      const statusEl = document.getElementById("u-status");
+      const fileInput = document.getElementById("u-file");
+      const file = fileInput.files[0];
+      const doc_type = document.getElementById("u-type").value;
+      const doc_date = document.getElementById("u-date").value;
+      if (!file) { statusEl.textContent = "Choose a photo to save."; statusEl.style.color = "var(--bt-red)"; return; }
+      if (!doc_date) { statusEl.textContent = "Pick a date."; statusEl.style.color = "var(--bt-red)"; return; }
+      if (!navigator.onLine) { statusEl.textContent = "You need a connection to save to the library."; statusEl.style.color = "var(--bt-red)"; return; }
+
+      const btn = document.getElementById("u-submit");
+      btn.disabled = true; btn.textContent = "Saving…";
+      statusEl.textContent = ""; statusEl.style.color = "";
+      try {
+        const meta = {
+          doc_type,
+          bank_name: doc_type === "bank_transfer" ? (document.getElementById("u-bank").value.trim() || null) : null,
+          category: doc_type === "bill" ? document.getElementById("u-category").value : null,
+          amount: parseFloat(document.getElementById("u-amount").value) || null,
+          doc_date,
+          notes: document.getElementById("u-notes").value.trim() || null,
+          income_id: null, expense_id: null
+        };
+        const saved = await btUploadDocument(btUid, file, meta);
+        allDocs.unshift(saved);
+        updateBankDatalist();
+        renderResults();
+        toast("Saved to library");
+        fileInput.value = "";
+        document.getElementById("u-bank").value = "";
+        document.getElementById("u-amount").value = "";
+        document.getElementById("u-notes").value = "";
+        document.getElementById("upload-form").classList.remove("show");
+      } catch (err) {
+        statusEl.textContent = err.message || "Couldn't save that document — try again.";
+        statusEl.style.color = "var(--bt-red)";
+      }
+      btn.disabled = false; btn.textContent = "Save to library";
+    });
+
+    if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
+  }
+  init();
+</script>
+</body>
+</html>

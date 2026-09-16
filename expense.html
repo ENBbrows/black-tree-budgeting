@@ -96,6 +96,9 @@
       </div>
     </div>
 
+    <label for="lib-file">Attach bill / receipt photo <span style="font-weight:400;color:var(--bt-muted)">(optional — saved to your private Document Library)</span></label>
+    <input id="lib-file" type="file" accept="image/*" capture="environment" />
+
     <button class="bt-btn bt-btn--gold" id="f-submit" style="margin-top:18px">Save expense</button>
   </div>
 
@@ -108,6 +111,7 @@
 <nav class="bt-bottom-nav">
   <a href="income.html">Income</a>
   <a href="expense.html" class="active">Expense</a>
+  <a href="library.html">Library</a>
   <a href="dashboard.html">Dashboard</a>
 </nav>
 
@@ -367,9 +371,23 @@
 
       if (payment_type) localStorage.setItem("bt_last_payment_type", payment_type);
 
+      const libFile = document.getElementById("lib-file").files[0];
+      if (libFile) {
+        if (navigator.onLine) {
+          btUploadDocument(btUid, libFile, {
+            doc_type: "bill", bank_name: null, category,
+            amount, doc_date: expense_date, notes, income_id: null, expense_id: null
+          }).then(() => toast("Receipt saved to Document Library"))
+            .catch(() => toast("Expense saved, but the receipt didn't upload — try adding it from the Document Library."));
+        } else {
+          toast("Expense saved offline — attach the receipt from the Document Library once you're back online.");
+        }
+      }
+
       document.getElementById("f-desc").value = "";
       document.getElementById("f-amount").value = "";
       document.getElementById("f-payment-account").value = "";
+      document.getElementById("lib-file").value = "";
       document.getElementById("scan-status").classList.remove("show");
       document.getElementById("category-hint").classList.remove("show");
       hideScanBubble();
