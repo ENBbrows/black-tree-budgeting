@@ -104,10 +104,8 @@
     <input id="s-name" type="text" />
     <div class="bt-field-row">
       <div><label data-tip="The currency label shown next to your numbers, e.g. TTD, USD.">Currency</label><input id="s-currency" type="text" maxlength="6" /></div>
-      <div><label data-tip="What percent of your income you're aiming to save each year. 20% is a good target for long-term financial independence.">Annual savings target</label><input id="s-target" type="number" min="0" max="100" step="1" /></div>
+      <div><label data-tip="Your gross annual income. Once set, this becomes the one fixed figure your Emergency Fund, Critical Illness Fund, Life Insurance, and Retirement Target all calculate from — instead of an estimate that shifts as you log more income through the year. Leave blank to keep using that estimate.">Annual income <span style="font-weight:400;color:var(--bt-muted)">(optional)</span></label><input id="s-annual-income" type="number" min="0" step="0.01" /></div>
     </div>
-    <label data-tip="Your gross annual income. Once set, this becomes the one fixed figure your Emergency Fund, Critical Illness Fund, Life Insurance, and Retirement Target all calculate from — instead of an estimate that shifts as you log more income through the year. Leave blank to keep using that estimate.">Annual income <span style="font-weight:400;color:var(--bt-muted)">(optional)</span></label>
-    <input id="s-annual-income" type="number" min="0" step="0.01" />
     <div class="bt-field-row">
       <div><label data-tip="How many people your income supports (yourself included) — just a headcount, used to give the Cost of Living figures context. Doesn't affect any calculation.">Dependents</label><input id="s-dependents" type="number" min="0" step="1" /></div>
       <div><label data-tip="Used only to unlock the Burial Fund section of the Protection Planner once you turn 50 — it isn't shown before then.">Date of birth <span style="font-weight:400;color:var(--bt-muted)">(optional)</span></label><input id="s-dob" type="date" /></div>
@@ -303,12 +301,12 @@
     </div>
 
     <div>
-      <div class="bt-card">
-        <h2><span class="bt-status-dot" id="savings-dot"></span>Savings Target</h2>
-        <p class="bt-sub" id="savings-sub" style="margin-bottom:10px">—</p>
-        <div id="savings-graphic"></div>
-        <div style="display:flex;justify-content:space-between;font-size:0.8rem;color:var(--bt-muted);margin-top:6px">
-          <span id="savings-actual"></span><span id="savings-target"></span>
+      <div class="bt-card" id="dip-card" style="display:none">
+        <h2 data-tip="Only shows up once you've logged real income and expenses — a suggested order to put this month's leftover money to work, based on your actual numbers. Every figure is yours to change; nothing here is saved automatically.">💡 Disposable Income Plan</h2>
+        <p class="bt-sub" id="dip-sub" style="margin-bottom:10px">—</p>
+        <div id="dip-list"></div>
+        <div style="display:flex;justify-content:space-between;font-size:0.85rem;margin-top:10px;padding-top:10px;border-top:1px solid var(--bt-border)">
+          <span>Allocated</span><span id="dip-total">—</span>
         </div>
       </div>
 
@@ -478,21 +476,33 @@
     `;
   }
 
-  function renderSavings(summary, today = new Date()) {
-    document.getElementById("savings-sub").textContent = `Target ${fmtPct(summary.targetPct)} of an estimated ${fmtMoney(summary.annualIncomeEstimate)} annual income.`;
-    const pct = summary.annualSavingsTarget > 0 ? Math.min(1, summary.ytdSavingsActual / summary.annualSavingsTarget) : 0;
-    document.getElementById("savings-graphic").innerHTML = progressGraphic(pct);
-    document.getElementById("savings-actual").textContent = fmtMoney(summary.ytdSavingsActual) + " saved YTD";
-    document.getElementById("savings-target").textContent = "Target " + fmtMoney(summary.annualSavingsTarget) + "/yr";
+  function renderDisposablePlan(store, summary) {
+    const card = document.getElementById("dip-card");
+    const hasData = store.income.length > 0 && store.expenses.length > 0;
+    if (!hasData) { card.style.display = "none"; return; }
+    card.style.display = "";
 
-    // On-track glance: compare YTD savings progress to how far through the year we are.
-    const dayOfYear = Math.ceil((today - new Date(today.getFullYear(), 0, 0)) / 86400000);
-    const yearFraction = dayOfYear / 365;
-    const dot = document.getElementById("savings-dot");
-    if (summary.annualSavingsTarget <= 0) { dot.className = "bt-status-dot"; }
-    else if (pct >= yearFraction) dot.className = "bt-status-dot bt-status-dot--green";
-    else if (pct >= yearFraction * 0.7) dot.className = "bt-status-dot bt-status-dot--yellow";
-    else dot.className = "bt-status-dot bt-status-dot--red";
+    const plan = btDisposableIncomePlan(store, summary, viewCurrency);
+    document.getElementById("dip-sub").textContent = plan.items.length
+      ? `You have ${fmtMoney(plan.disposable)} in disposable income this month — here's a suggested order to put it to work. Adjust any figure below as you like.`
+      : `You have ${fmtMoney(plan.disposable)} in disposable income this month, with nothing urgent left to fund — save it, spend it, or add a new goal.`;
+
+    document.getElementById("dip-list").innerHTML = plan.items.map((item) => `
+      <div class="bt-field-row" style="align-items:center;margin-bottom:8px">
+        <div style="flex:1;font-size:0.85rem">${item.icon} ${btEscapeHtml(item.label)}</div>
+        <div style="flex:none;width:120px"><input type="number" min="0" step="0.01" class="dip-input" value="${item.suggested.toFixed(2)}" /></div>
+      </div>
+    `).join("");
+
+    const updateTotal = () => {
+      let total = 0;
+      document.querySelectorAll(".dip-input").forEach((el) => { total += parseFloat(el.value) || 0; });
+      const totalEl = document.getElementById("dip-total");
+      totalEl.textContent = `${fmtMoney(total)} of ${fmtMoney(plan.disposable)}`;
+      totalEl.style.color = total > plan.disposable + 0.01 ? "var(--bt-red)" : "var(--bt-green)";
+    };
+    document.querySelectorAll(".dip-input").forEach((el) => el.addEventListener("input", updateTotal));
+    updateTotal();
   }
 
   function renderVacationVaultUnlock(store) {
@@ -996,7 +1006,7 @@
     renderStats("stats-month", summary.periods.month);
     renderStats("stats-ytd", summary.periods.ytd);
     renderVacationVaultUnlock(store);
-    renderSavings(summary);
+    renderDisposablePlan(store, summary);
     renderGoals(store);
     renderDebts(store);
     renderBadges(store, summary);
@@ -1012,7 +1022,6 @@
     if (!readOnly) {
       document.getElementById("s-name").value = store.profile?.full_name || "";
       document.getElementById("s-currency").value = store.profile?.currency || "TTD";
-      document.getElementById("s-target").value = Math.round((store.profile?.annual_savings_target_pct ?? 0.2) * 100);
       document.getElementById("s-annual-income").value = store.profile?.annual_income || "";
       document.getElementById("s-dependents").value = store.profile?.dependents_count || 0;
       document.getElementById("s-dob").value = store.profile?.date_of_birth || "";
@@ -1191,7 +1200,6 @@
       document.getElementById("s-save").addEventListener("click", () => {
         const full_name = document.getElementById("s-name").value.trim() || null;
         const curr = document.getElementById("s-currency").value.trim() || "TTD";
-        const pct = Math.max(0, Math.min(100, parseFloat(document.getElementById("s-target").value) || 0)) / 100;
         const annualIncomeVal = parseFloat(document.getElementById("s-annual-income").value);
         const annual_income = annualIncomeVal > 0 ? annualIncomeVal : null;
         const dependents_count = Math.max(0, parseInt(document.getElementById("s-dependents").value, 10) || 0);
@@ -1206,7 +1214,7 @@
           const v = parseFloat(el.value);
           if (v > 0) category_budgets[el.dataset.category] = v;
         });
-        btUpdateProfile(btUid, { full_name, currency: curr, annual_savings_target_pct: pct, annual_income, dependents_count, date_of_birth, fx_rates, category_budgets });
+        btUpdateProfile(btUid, { full_name, currency: curr, annual_income, dependents_count, date_of_birth, fx_rates, category_budgets });
         refreshGoalCategoryOptions();
         renderAll();
         toast("Settings saved");

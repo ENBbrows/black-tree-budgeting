@@ -657,12 +657,10 @@ function btDashboardSummary(store, viewCurrency, today = new Date()) {
     if (inc.unconverted || exp.unconverted) hasUnconverted = true;
     out[key] = { income: inc.total, expenses: exp.total, net: inc.total - exp.total, start, end };
   }
-  const annualIncomeEstimate = btEstimateAnnualIncome(store, vc, today);
-  const targetPct = profile?.annual_savings_target_pct ?? 0.20;
-  const annualSavingsTarget = annualIncomeEstimate * targetPct;
+  const annualIncomeEstimate = btAnnualIncomeBasis(store, vc, today).annualIncome;
   const ytdSavingsActual = btSumExpenseCategoryInRange(store.expenses, "Savings & Investments", periods.ytd.start, periods.ytd.end, vc, profile);
 
-  return { viewCurrency: vc, hasUnconverted, periods: out, annualIncomeEstimate, annualSavingsTarget, ytdSavingsActual, targetPct };
+  return { viewCurrency: vc, hasUnconverted, periods: out, annualIncomeEstimate, ytdSavingsActual };
 }
 
 function btGoalProgress(store) {
@@ -754,6 +752,64 @@ function btDebtPayoffOpportunity(store, summary) {
   const owed = btDebtAvalancheOrder(store).filter((l) => l.estimated_remaining > 0);
   if (!owed.length || !(disposable > 0)) return { eligible: false, disposable, topDebt: null };
   return { eligible: true, disposable, topDebt: owed[0] };
+}
+
+/**
+ * A suggested, priority-ordered way to put this month's disposable income
+ * to work: highest-interest debt first (avalanche order), then Emergency/
+ * Critical Illness/Burial Fund, then any tracked insurance renewal that's
+ * still short, then other active goals, with the Vacation Vault (once
+ * unlocked) absorbing whatever's left over. Every figure here is a
+ * starting suggestion, not a plan that gets saved anywhere — the client
+ * is meant to treat each one as adjustable.
+ */
+function btDisposableIncomePlan(store, summary, viewCurrency) {
+  const profile = store.profile;
+  const { disposable } = btDisposableIncome(store, summary);
+  const goals = btGoalProgress(store);
+  const savedIn = (category) => goals.filter((g) => g.category === category).reduce((s, g) => s + g.saved_amount, 0);
+
+  const items = [];
+  let pool = Math.max(0, disposable);
+  const addItem = (id, icon, label, need) => {
+    if (!(need > 0) || !(pool > 0)) return;
+    const suggested = Math.min(pool, need);
+    items.push({ id, icon, label, suggested });
+    pool -= suggested;
+  };
+
+  const topDebt = btDebtAvalancheOrder(store).find((l) => l.estimated_remaining > 0);
+  if (topDebt) addItem("debt", "💳", `${topDebt.debt_name} (highest interest)`, topDebt.estimated_remaining);
+
+  const ef = btEmergencyFundTarget(store, viewCurrency, profile?.emergency_fund_months);
+  addItem("ef", "🛟", "Emergency Fund", ef.target - savedIn("Emergency Fund"));
+
+  const ci = btCriticalIllnessFundTarget(store, viewCurrency);
+  addItem("ci", "🏥", "Critical Illness Fund", ci.target - savedIn("Critical Illness Fund"));
+
+  if (btBurialFundApplies(profile)) {
+    addItem("bf", "⚱️", "Burial Fund", btBurialFundTotal(profile) - savedIn("Burial Fund"));
+  }
+
+  if (Number(profile?.car_insurance_premium) > 0) {
+    addItem("car-ins", "🚗", "Car Insurance renewal", Number(profile.car_insurance_premium) - savedIn("Car Insurance"));
+  }
+  if (Number(profile?.property_insurance_premium) > 0) {
+    addItem("prop-ins", "🏠", "Property Insurance renewal", Number(profile.property_insurance_premium) - savedIn("Property Insurance"));
+  }
+
+  const specialCategories = ["Emergency Fund", "Critical Illness Fund", "Burial Fund", "Car Insurance", "Property Insurance", "Vacation Vault"];
+  const otherNeed = goals
+    .filter((g) => !specialCategories.includes(g.category) && g.progress_pct < 1)
+    .reduce((s, g) => s + (g.target_amount - g.saved_amount), 0);
+  addItem("other-goals", "🎯", "Your other goals", otherNeed);
+
+  if (pool > 0 && btProtectionFullyCovered(store, viewCurrency, profile)) {
+    items.push({ id: "vault", icon: "🌴", label: "Vacation Vault", suggested: pool });
+    pool = 0;
+  }
+
+  return { disposable, items, unallocated: pool };
 }
 
 /** Red/Yellow/Green health flags, thresholds straight from the source spreadsheet's guideline sheets. */
