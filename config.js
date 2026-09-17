@@ -138,6 +138,18 @@ const BT_CONFIG = {
     { key: "legal", label: "Legal / estate settlement fees", low: 500, high: 5000 }
   ],
 
+  /* Vacation Vault — itemized trip-cost line items, same low/high +
+     client-override pattern as the Burial Fund breakdown above. Sums to
+     the total the client is actually saving toward for their next trip. */
+  VACATION_VAULT_ITEMS: [
+    { key: "airfare", label: "Airfare", low: 1500, high: 4000 },
+    { key: "hotel", label: "Hotel / accommodation", low: 2000, high: 6000 },
+    { key: "food", label: "Food & dining", low: 1000, high: 3000 },
+    { key: "entertainment", label: "Entertainment & activities", low: 500, high: 2000 },
+    { key: "travel", label: "Local travel / transport", low: 300, high: 1000 },
+    { key: "gifts", label: "Gifts & souvenirs", low: 300, high: 1000 }
+  ],
+
   /* Health-check thresholds — pulled directly from the Blacktree Financial
      Services 12-Month Tracking Tool's own guideline sheets, just applied
      live instead of read off a spreadsheet. */

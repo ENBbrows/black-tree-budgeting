@@ -131,16 +131,28 @@
     <p class="bt-sub" style="margin-bottom:10px">Your fund for the trip itself — airfare, hotel stays, food, entertainment, day-to-day travel, and gifts or souvenirs — budgeted for ahead of time instead of scrambled together at the last minute.</p>
     <div id="vv-locked-note" class="vv-locked-note">🔒 Fully fund your Emergency Fund, Critical Illness Fund, and Burial Fund first — this unlocks once all three are covered.</div>
     <div id="vv-unlocked-note" class="vv-unlocked-note" style="display:none">🔓 Every base is covered — time to start putting something aside for flights, hotel stays, food, entertainment, travel, and gifts or souvenirs on your next trip.</div>
-    <p class="prot-basis" id="vv-basis">—</p>
-    <div class="prot-field-row">
+
+    <h2 class="bf-toggle-head" id="vv-toggle" data-tip="Typical costs for a trip — airfare, hotel, food, entertainment, local travel, and gifts or souvenirs. Every line is your own estimate, adjustable to your situation. Click to expand or collapse the breakdown.">Trip breakdown <span class="bf-chevron" id="vv-chevron">▾</span></h2>
+    <p class="bf-range" id="vv-range">—</p>
+    <div class="bf-total">
+      <span>Your estimated total</span>
+      <span class="amt" id="vv-items-total">—</span>
+    </div>
+    <div id="vv-goal-progress"></div>
+    <div class="bf-detail" id="vv-detail">
+      <div id="vv-items"></div>
+      <button class="bt-btn bt-btn--gold bt-btn--sm" id="vv-items-save" style="margin-top:16px">Save breakdown</button>
+    </div>
+
+    <div class="prot-field-row" style="margin-top:16px;padding-top:14px;border-top:1px dashed var(--bt-border)">
       <div>
         <label for="vv-pct" style="margin:0 0 4px;display:block;font-size:0.82rem">% of disposable income</label>
         <input id="vv-pct" type="number" min="0" max="100" step="1" disabled />
       </div>
       <button class="bt-btn bt-btn--gold bt-btn--sm" id="vv-save" disabled>Update</button>
     </div>
+    <p class="prot-basis" id="vv-basis">—</p>
     <div class="prot-target" id="vv-target">—</div>
-    <div id="vv-saved"></div>
   </div>
 
   <h2 class="prot-section-head">Insurance Renewals</h2>
@@ -259,6 +271,33 @@
     document.getElementById("bf-goal-progress").innerHTML = goalProgressHtml(btLoadStore(btUid), "Burial Fund", total, currency);
   }
 
+  function renderVacationVaultItems(profile, currency) {
+    const range = btVacationVaultRange();
+    document.getElementById("vv-range").textContent = `Typical range: ${fmtMoney(range.low, currency)} – ${fmtMoney(range.high, currency)}`;
+
+    const items = btVacationVaultItemValues(profile);
+    document.getElementById("vv-items").innerHTML = items.map((it) => `
+      <div class="bf-item">
+        <div>
+          <div class="bf-item-label">${it.label}</div>
+          <div class="bf-item-hint">typically ${fmtMoney(it.low, currency)} – ${fmtMoney(it.high, currency)}</div>
+        </div>
+        <input type="number" min="0" step="1" class="vv-item-input" data-key="${it.key}" value="${it.value}" />
+      </div>
+    `).join("");
+
+    const updateTotal = () => {
+      let total = 0;
+      document.querySelectorAll(".vv-item-input").forEach((el) => { total += parseFloat(el.value) || 0; });
+      document.getElementById("vv-items-total").textContent = fmtMoney(total, currency);
+      return total;
+    };
+    document.querySelectorAll(".vv-item-input").forEach((el) => el.addEventListener("input", updateTotal));
+    const total = updateTotal();
+    document.getElementById("vv-goal-progress").innerHTML = goalProgressHtml(btLoadStore(btUid), "Vacation Vault", total, currency)
+      || `<p class="prot-note">Add a "Vacation Vault" goal from the Dashboard to start tracking what you've saved toward this.</p>`;
+  }
+
   function renderVacationVault(store) {
     const profile = store.profile;
     const currency = profile?.currency || "TTD";
@@ -278,11 +317,7 @@
     saveBtn.disabled = !unlocked;
     pctInput.value = profile?.vacation_vault_pct ?? 10;
 
-    const linked = btGoalProgress(store).filter((g) => g.category === "Vacation Vault");
-    const saved = linked.reduce((s, g) => s + g.saved_amount, 0);
-    document.getElementById("vv-saved").innerHTML = linked.length
-      ? `<p class="prot-note">${fmtMoney(saved, currency)} saved so far toward your Vacation Vault — airfare, hotel, food, entertainment, travel, and souvenirs, all covered ahead of time.</p>`
-      : `<p class="prot-note">Add a "Vacation Vault" goal from the Dashboard to start tracking what you've saved toward airfare, hotel stays, food, entertainment, travel, and gifts or souvenirs.</p>`;
+    renderVacationVaultItems(profile, currency);
 
     if (!unlocked) {
       document.getElementById("vv-basis").textContent = "";
@@ -440,6 +475,17 @@
       localStorage.setItem(bfCollapseKey, collapsed ? "1" : "0");
     });
 
+    const vvCollapseKey = "bt_vv_collapsed_" + btUid;
+    if (localStorage.getItem(vvCollapseKey) === "1") {
+      document.getElementById("vv-detail").classList.add("collapsed");
+      document.getElementById("vv-chevron").classList.add("collapsed");
+    }
+    document.getElementById("vv-toggle").addEventListener("click", () => {
+      const collapsed = document.getElementById("vv-detail").classList.toggle("collapsed");
+      document.getElementById("vv-chevron").classList.toggle("collapsed", collapsed);
+      localStorage.setItem(vvCollapseKey, collapsed ? "1" : "0");
+    });
+
     btWireScanFab("scan-fab-btn", "scan-fab-file");
 
     [["ci", "critical_illness_monthly_override", "Critical Illness"], ["li", "life_insurance_monthly_override", "Life Insurance"]].forEach(([kind, field, label]) => {
@@ -485,6 +531,17 @@
       store = btLoadStore(btUid);
       renderAll(store);
       toast("Vacation Vault updated");
+    });
+
+    document.getElementById("vv-items-save").addEventListener("click", () => {
+      const estimates = {};
+      document.querySelectorAll(".vv-item-input").forEach((el) => {
+        estimates[el.dataset.key] = Math.max(0, parseFloat(el.value) || 0);
+      });
+      btUpdateProfile(btUid, { vacation_vault_estimates: estimates });
+      store = btLoadStore(btUid);
+      renderAll(store);
+      toast("Trip breakdown saved");
     });
 
     ["car", "property"].forEach((kind) => {

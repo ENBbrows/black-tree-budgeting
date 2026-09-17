@@ -970,6 +970,24 @@ function btBurialFundTotal(profile) {
   return btBurialFundItemValues(profile).reduce((s, it) => s + Number(it.value || 0), 0);
 }
 
+/** Typical low/high cost range across every Vacation Vault line item. */
+function btVacationVaultRange() {
+  const items = (typeof BT_CONFIG !== "undefined" && BT_CONFIG.VACATION_VAULT_ITEMS) || [];
+  return items.reduce((acc, it) => ({ low: acc.low + it.low, high: acc.high + it.high }), { low: 0, high: 0 });
+}
+
+/** Per-item Vacation Vault estimate: the client's own saved figure if they've adjusted it, else the midpoint of that item's typical range. */
+function btVacationVaultItemValues(profile) {
+  const items = (typeof BT_CONFIG !== "undefined" && BT_CONFIG.VACATION_VAULT_ITEMS) || [];
+  const overrides = profile?.vacation_vault_estimates || {};
+  return items.map((it) => ({ ...it, value: overrides[it.key] ?? Math.round((it.low + it.high) / 2) }));
+}
+
+/** Vacation Vault total — sum of the current per-item estimates (saved overrides or defaults). */
+function btVacationVaultItemsTotal(profile) {
+  return btVacationVaultItemValues(profile).reduce((s, it) => s + Number(it.value || 0), 0);
+}
+
 /**
  * Whether every base is covered: Emergency Fund, Critical Illness Fund,
  * and — for clients 50 and over — Burial Fund each have a linked goal
