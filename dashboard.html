@@ -24,6 +24,11 @@
   .bt-agent-banner a { color: var(--bt-gold-light); }
   #setpw-status.err { color: var(--bt-red); }
   .bt-role-tag { font-size:0.68rem; text-transform:uppercase; letter-spacing:0.03em; padding:3px 8px; border-radius:999px; font-weight:700; }
+  .bf-toggle-head { cursor: pointer; user-select: none; display:flex; align-items:center; justify-content:space-between; }
+  .bf-chevron { font-weight: 400; color: var(--bt-muted); transition: transform .2s; }
+  .bf-chevron.collapsed { transform: rotate(-90deg); }
+  .bf-detail { overflow: hidden; max-height: 3000px; transition: max-height .3s ease; }
+  .bf-detail.collapsed { max-height: 0; }
   canvas { width: 100%; display:block; }
   .bt-section-head { display:flex; align-items:center; justify-content:space-between; margin: 26px 0 10px; }
   .bt-mini-form { display:none; margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--bt-border); }
@@ -64,6 +69,8 @@
   .bt-debt-power-wrap { height: 62px; display:flex; align-items:center; justify-content:center; margin: 0 auto 8px; }
   .bt-debt-power { width: 56px; height: 14px; border-radius: 7px; background: var(--bt-border); position: relative; overflow: hidden; flex-shrink:0; }
   .bt-debt-power .fill { position:absolute; inset:0; border-radius:7px; background: linear-gradient(90deg, var(--bt-red) 0%, var(--bt-yellow) 50%, var(--bt-green) 100%); }
+  .bt-progress--debt { position: relative; }
+  .bt-progress--debt .bt-progress-debt-fill { position: absolute; inset: 0; border-radius: 999px; background: linear-gradient(90deg, var(--bt-red) 0%, var(--bt-yellow) 50%, var(--bt-green) 100%); }
   .bt-badge-card .name { font-size: 0.82rem; font-weight:600; margin-bottom:4px; }
   .bt-badge-card .status { font-size: 0.72rem; color: var(--bt-muted); }
   .bt-badge-card.earned .status { color: var(--bt-green); font-weight:600; }
@@ -99,7 +106,9 @@
   </div>
 
   <div class="bt-card" id="settings-card">
-    <h2>Settings</h2>
+    <h2 class="bf-toggle-head" id="settings-toggle">Settings <span class="bf-chevron" id="settings-chevron">▾</span></h2>
+    <p class="bt-sub" id="settings-collapsed-hint" style="display:none;margin-bottom:0">One-time setup — name, currency, income, and other details you'll rarely need to touch again. Tap to edit.</p>
+    <div class="bf-detail" id="settings-detail">
     <label data-tip="How you'd like to be greeted on your Dashboard, e.g. &quot;Amii&quot; or &quot;Amii Leroux&quot;.">Full name</label>
     <input id="s-name" type="text" />
     <div class="bt-field-row">
@@ -126,6 +135,7 @@
     <label style="margin-top:20px;display:flex;align-items:center;gap:8px;font-weight:400;color:var(--bt-muted);cursor:pointer">
       <input type="checkbox" id="s-show-tips" style="width:auto" /> Show help bubbles on form fields
     </label>
+    </div>
   </div>
 
   <div class="bt-view-toggle" id="view-toggle">
@@ -177,6 +187,12 @@
     <h2>💬 Room to invest more</h2>
     <p id="invest-cta-text">Your budget's healthy and you have disposable income beyond essentials and savings — a good moment to talk with your advisor about your Emergency Fund, Critical Illness and Life Insurance coverage, retirement contributions, or other ways to secure your family's future.</p>
     <a class="bt-btn bt-btn--gold" id="invest-cta-btn" href="#" target="_blank" rel="noopener">Talk to Your Advisor</a>
+  </div>
+
+  <div class="bt-card bt-invest-card" id="insurance-cta" style="display:none">
+    <h2>⏰ Insurance renewal coming up</h2>
+    <p id="insurance-cta-text">—</p>
+    <a class="bt-btn bt-btn--gold" href="protection.html" style="text-decoration:none">Review renewal</a>
   </div>
 
   <div class="bt-top-grid">
@@ -396,6 +412,19 @@
     return `<div class="bt-progress"><div style="width:${p * 100}%;background:${c}"></div></div>`;
   }
 
+  /** Same as progressGraphic, but the fill is a fixed red-orange-green gradient (red = just started/alarming, orange = making headway, green = paid off) instead of a solid color — used for debts instead of the gold bar everything else gets. */
+  function debtProgressGraphic(pct) {
+    const p = Math.max(0, Math.min(1, pct || 0));
+    if (btViewMode === "list") return "";
+    if (btViewMode === "pie") {
+      const deg = Math.round(p * 360);
+      const c = p < 0.34 ? "var(--bt-red)" : p < 0.67 ? "var(--bt-yellow)" : "var(--bt-green)";
+      return `<div class="bt-donut" style="background:conic-gradient(${c} ${deg}deg, var(--bt-border) ${deg}deg)"><span class="bt-donut-pct">${Math.round(p * 100)}%</span></div>`;
+    }
+    const emptyPct = Math.round((1 - p) * 100);
+    return `<div class="bt-progress bt-progress--debt"><div class="bt-progress-debt-fill" style="clip-path: inset(0 ${emptyPct}% 0 0)"></div></div>`;
+  }
+
   /** A proportional breakdown (parts of a whole) as a CSS conic-gradient pie + legend. segments: [{label, amount, color, note}]. */
   function renderPieChart(wrap, segments) {
     const total = segments.reduce((s, r) => s + r.amount, 0);
@@ -441,6 +470,31 @@
     const body = `Hi,\n\nMy budget's in a healthy place and I have some disposable income (about ${fmtMoney(opp.disposable)} this month) that I'd like to put to work. Could we set up a time to talk about my options — Emergency Fund, Critical Illness cover, Life Insurance, retirement, or other investments?\n\nThanks!`;
     document.getElementById("invest-cta-btn").href =
       `mailto:${BT_CONFIG.SUPPORT_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  }
+
+  /** Surfaces a Car/Property Insurance renewal within the final week (or already overdue) right on the Dashboard, so it doesn't only show up if the client happens to visit the Protection Planner. */
+  function renderInsuranceReminder(store) {
+    const card = document.getElementById("insurance-cta");
+    if (readOnly) { card.style.display = "none"; return; }
+    const profile = store.profile;
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const items = [];
+    [["car", "Car"], ["property", "Property"]].forEach(([kind, label]) => {
+      const premium = profile?.[`${kind}_insurance_premium`];
+      const date = profile?.[`${kind}_insurance_renewal_date`];
+      if (!premium || !date) return;
+      const renewal = new Date(date + "T00:00:00");
+      const daysUntil = Math.round((renewal - today) / 86400000);
+      if (daysUntil <= 7) items.push({ label, daysUntil, date, premium: Number(premium) });
+    });
+    if (!items.length) { card.style.display = "none"; return; }
+    card.style.display = "";
+    items.sort((a, b) => a.daysUntil - b.daysUntil);
+    document.getElementById("insurance-cta-text").textContent = items.map((it) => {
+      if (it.daysUntil < 0) return `${it.label} Insurance (${fmtMoney(it.premium)}) was due to renew ${it.date} — it's overdue.`;
+      if (it.daysUntil === 0) return `${it.label} Insurance renews today — ${fmtMoney(it.premium)}.`;
+      return `${it.label} Insurance renews in ${it.daysUntil} day${it.daysUntil === 1 ? "" : "s"} (${it.date}) — ${fmtMoney(it.premium)}.`;
+    }).join(" ");
   }
 
   /** Returns whether the card was shown — used to suppress the "invest more" CTA below, since paying down real debt almost always beats investing further. */
@@ -573,7 +627,22 @@
     } catch (e) { /* Web Audio unavailable — badge still glows silently */ }
   }
 
-  const GOAL_BADGE_ICONS = { "House Down Payment": "🏠", "Car Down Payment": "🚗" };
+  const GOAL_BADGE_ICONS = {
+    "Debt Reduction": "💸",
+    "Investing": "📈",
+    "Education": "🎓",
+    "Emergency Fund": "🛟",
+    "Critical Illness Fund": "🏥",
+    "Burial Fund": "⚱️",
+    "House Down Payment": "🏠",
+    "Investment Property Down Payment": "🏢",
+    "Car Down Payment": "🚗",
+    "Car Insurance": "🚙",
+    "Property Insurance": "🛡️",
+    "Taxes": "🧾",
+    "Personal": "🙂",
+    "Other": "🎯"
+  };
 
   function computeBadges(store, summary) {
     const badges = [];
@@ -703,7 +772,7 @@
       return `
       <div class="bt-debt-item">
         <div class="row1"><span style="display:flex;align-items:center;gap:6px">${dot}<strong>${btEscapeHtml(l.debt_name)}</strong>${priorityTag}</span><span>${fmtHome(l.estimated_remaining)} left</span></div>
-        ${progressGraphic(pctPaid)}
+        ${debtProgressGraphic(pctPaid)}
         <div class="meta">${btEscapeHtml(l.lender) || "—"}${l.interest_rate ? " · " + l.interest_rate + "%" : ""} · ${fmtHome(l.paid_via_tracker)} paid via tracker${paceNote ? " · " + paceNote : ""}${l.needs_payment_reminder ? ` · no payment in ${l.days_since_payment}d` : ""}</div>
       </div>`;
     }).join("");
@@ -957,7 +1026,7 @@
     document.getElementById("col-note").textContent = note;
   }
 
-  const BUDGET_TYPE_BADGE = { need: "🟢 Need", want: "🔵 Want", savings: "💰 Savings" };
+  const BUDGET_TYPE_BADGE = { need: "🟢 Need", want: "🔵 Want", savings: "💰 Savings", give: "🤲 Giving" };
 
   function renderBudgetsInputs(store) {
     const budgets = store.profile?.category_budgets || {};
@@ -1000,6 +1069,7 @@
     const summary = btDashboardSummary(store, viewCurrency);
     const flags = btHealthFlags(store, summary);
     renderFlags(flags);
+    renderInsuranceReminder(store);
     const debtCtaShown = renderDebtCta(store, summary);
     renderInvestCta(store, summary, flags, debtCtaShown);
     renderWeekSpend(summary.periods.week);
@@ -1082,6 +1152,25 @@
 
     if (!readOnly) {
       refreshGoalCategoryOptions();
+
+      // Settings is one-time setup — expanded by default for a brand-new
+      // profile (nothing filled in yet), collapsed by default once it looks
+      // like setup's already been done. A manual toggle always wins after that.
+      const settingsCollapseKey = "bt_settings_collapsed_" + btUid;
+      let settingsPref = localStorage.getItem(settingsCollapseKey);
+      if (settingsPref === null) settingsPref = btLoadStore(btUid).profile?.full_name ? "1" : "0";
+      const applySettingsCollapse = (collapsed) => {
+        document.getElementById("settings-detail").classList.toggle("collapsed", collapsed);
+        document.getElementById("settings-chevron").classList.toggle("collapsed", collapsed);
+        document.getElementById("settings-collapsed-hint").style.display = collapsed ? "" : "none";
+      };
+      applySettingsCollapse(settingsPref === "1");
+      document.getElementById("settings-toggle").addEventListener("click", () => {
+        const collapsed = document.getElementById("settings-detail").classList.toggle("collapsed");
+        applySettingsCollapse(collapsed);
+        localStorage.setItem(settingsCollapseKey, collapsed ? "1" : "0");
+      });
+
       document.getElementById("b-category").innerHTML = BT_CONFIG.EXPENSE_CATEGORIES.map((c) => `<option value="${c}">${c}</option>`).join("");
 
       const showTipsBox = document.getElementById("s-show-tips");

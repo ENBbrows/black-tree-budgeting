@@ -34,7 +34,8 @@ const BT_CONFIG = {
      so the single Expense Tracker shortcut can feed the whole dashboard. */
   EXPENSE_CATEGORIES: [
     "Housing", "Utilities", "Transport", "Food", "Personal",
-    "Insurance", "Debt Repayment", "Savings & Investments", "Education", "Taxes", "Other"
+    "Insurance", "Debt Repayment", "Savings & Investments", "Education",
+    "Charity / Tithe / Zakat", "Taxes", "Other"
   ],
 
   /* Categories that can optionally be tagged to a goal or a debt so that
@@ -42,7 +43,7 @@ const BT_CONFIG = {
   GOAL_LINK_CATEGORY: "Savings & Investments",
   DEBT_LINK_CATEGORY: "Debt Repayment",
 
-  GOAL_CATEGORIES: ["Debt Reduction", "Investing", "Education", "Emergency Fund", "Critical Illness Fund", "Burial Fund", "Vacation Vault", "House Down Payment", "Car Down Payment", "Car Insurance", "Property Insurance", "Taxes", "Personal", "Other"],
+  GOAL_CATEGORIES: ["Debt Reduction", "Investing", "Education", "Emergency Fund", "Critical Illness Fund", "Burial Fund", "Vacation Vault", "House Down Payment", "Investment Property Down Payment", "Car Down Payment", "Car Insurance", "Property Insurance", "Taxes", "Personal", "Other"],
 
   /* Categories treated as "cost of living" — the baseline that has to keep
      running no matter what. Everything else (Personal, Education, Other)
@@ -66,6 +67,7 @@ const BT_CONFIG = {
     "Debt Repayment": { type: "need", lowPct: 5, highPct: 15 },
     "Taxes": { type: "need", lowPct: null, highPct: null },
     "Savings & Investments": { type: "savings", lowPct: 10, highPct: 20 },
+    "Charity / Tithe / Zakat": { type: "give", lowPct: 2.5, highPct: 10 },
     "Personal": { type: "want", lowPct: 5, highPct: 10 },
     "Education": { type: "want", lowPct: 5, highPct: 10 },
     "Other": { type: "want", lowPct: 5, highPct: 10 }
@@ -85,6 +87,7 @@ const BT_CONFIG = {
     "Debt Repayment": ["loan payment", "car loan", "credit card payment", "mortgage payment", "loan installment"],
     "Savings & Investments": ["savings", "investment", "mutual fund", "stocks", "utc", "deposit"],
     "Education": ["school", "tuition", "textbook", "books", "course", "exam fee"],
+    "Charity / Tithe / Zakat": ["tithe", "tithing", "zakat", "charity", "donation", "offering", "sadaqah"],
     "Taxes": ["tax", "board of inland revenue", "bir", "vat", "property tax", "income tax"],
     "Personal": ["netflix", "spotify", "gym", "haircut", "salon", "shopping", "clothes", "subscription"]
   },
