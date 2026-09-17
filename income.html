@@ -226,7 +226,23 @@
       document.getElementById("lib-file").value = "";
     });
 
-    if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("sw.js").catch(() => {});
+      // A new service worker taking over means fresh HTML/JS is available —
+      // reload once to pick it up, so an already-open tab or installed PWA
+      // icon doesn't keep running old code indefinitely. sessionStorage
+      // (not a plain JS variable) survives the reload itself, and the
+      // timestamp check stops a same-instant double-fire from reloading
+      // twice while still allowing a genuinely new update later in the
+      // same session to reload again.
+      navigator.serviceWorker.addEventListener("controllerchange", () => {
+        let last = 0;
+        try { last = parseInt(sessionStorage.getItem("bt_sw_reload_ts") || "0", 10); } catch (e) {}
+        if (Date.now() - last < 5000) return;
+        try { sessionStorage.setItem("bt_sw_reload_ts", String(Date.now())); } catch (e) {}
+        window.location.reload();
+      });
+    }
   }
   init();
 </script>
