@@ -368,8 +368,20 @@ async function btScanBillImage(file, onProgress) {
     date: btGuessDateFromText(text),
     merchant: btGuessMerchantFromText(text),
     category: btGuessCategory(text),
-    paymentType: btGuessPaymentType(text)
+    paymentType: btGuessPaymentType(text),
+    // Raw line-by-line text, for tagging individual lines of a mixed
+    // receipt to different categories so a single bill can be split
+    // across more than one — see btGuessLineAmount below.
+    lines: text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean)
   };
+}
+
+/** Best-guess dollar amount for a single receipt line — the trailing price on an "item ... $12.99" style line. Stricter than btGuessAmountFromText (requires cents) since a line has much less context to disambiguate a quantity from a price. */
+function btGuessLineAmount(line) {
+  if (!line) return null;
+  const numRe = /\d{1,3}(?:,\d{3})*\.\d{2}/g;
+  const nums = (line.match(numRe) || []).map((n) => parseFloat(n.replace(/,/g, ""))).filter((n) => !isNaN(n) && n > 0);
+  return nums.length ? nums[nums.length - 1] : null;
 }
 
 /**

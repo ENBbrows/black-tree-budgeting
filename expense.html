@@ -28,6 +28,13 @@
   #scan-bubble .bt-chip-row { margin-bottom: 14px; }
   #scan-bubble .bt-btn--sm { width: auto; margin-top: 2px; }
   .scan-bubble-note { font-size: 0.78rem; color: var(--bt-muted); margin: 0 0 10px; }
+  #scan-lines-list { max-height: 220px; overflow-y: auto; border: 1px solid var(--bt-border); border-radius: 8px; padding: 4px 10px; margin-bottom: 10px; background: var(--bt-white); }
+  .scan-line-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; font-size: 0.78rem; border-bottom: 1px dashed var(--bt-border); cursor: pointer; }
+  .scan-line-row:last-child { border-bottom: none; }
+  .scan-line-row--tagged { color: var(--bt-muted); }
+  .scan-line-row input[type="checkbox"] { width: auto; flex: none; }
+  .scan-line-text { flex: 1; word-break: break-word; }
+  .scan-line-tag { flex: none; background: var(--bt-gold); color: #fff; }
 </style>
 </head>
 <body>
@@ -56,11 +63,14 @@
 
   <div id="scan-bubble">
     <p>Scanned <strong id="bubble-summary"></strong></p>
-    <p class="scan-bubble-note">What category is this?</p>
-    <div class="bt-chip-row" id="bubble-category-chips"></div>
     <p class="scan-bubble-note">How was it paid?</p>
     <div class="bt-chip-row" id="bubble-payment-chips"></div>
-    <button type="button" class="bt-btn bt-btn--ghost bt-btn--sm" id="bubble-done">Done</button>
+    <div id="scan-lines-wrap" style="display:none">
+      <p class="scan-bubble-note">Covers more than one kind of spending? Tap the lines for a category below, then tap that category to tag them — repeat for each category on the bill.</p>
+      <div id="scan-lines-list"></div>
+      <div class="bt-chip-row" id="scan-lines-cat-chips"></div>
+    </div>
+    <button type="button" class="bt-btn bt-btn--ghost bt-btn--sm" id="bubble-done" style="margin-top:12px">Done</button>
   </div>
 
   <div class="bt-card">
@@ -78,9 +88,17 @@
       </div>
     </div>
 
-    <label for="f-category" data-tip="What kind of spending this is — we guess this from what you typed above, but change it any time. Pick Debt Repayment or Savings & Investments if you want it to count toward a goal or debt below.">Category</label>
-    <select id="f-category"></select>
-    <p id="category-hint">Guessed from what you typed — change it if that's not right.</p>
+    <label data-tip="What kind of spending this is — we guess this from what you typed above, but change it any time. Pick more than one if this bill covers several kinds of spending (a supermarket run that's also got household items, say) — you'll get to split the amount across them. Pick Debt Repayment or Savings & Investments if you want it to count toward a goal or debt below.">Category <span style="font-weight:400;color:var(--bt-muted)">(pick one, or several if this bill covers more than one)</span></label>
+    <div class="bt-chip-row" id="f-category-chips"></div>
+    <p id="category-hint">Guessed from what you typed — tap to change, or tap more to add.</p>
+
+    <div id="split-wrap" style="display:none">
+      <label style="margin:0 0 8px" data-tip="How much of the total belongs to each category — defaults to an even split, adjust as needed. Makes Spending by Category accurate for a bill that covers more than one kind of spending.">Split amount across categories</label>
+      <div id="split-list"></div>
+      <div style="display:flex;justify-content:space-between;font-size:0.82rem;margin-top:8px">
+        <span>Allocated</span><span id="split-total">—</span>
+      </div>
+    </div>
 
     <div id="link-wrap" style="display:none">
       <label for="f-link" data-tip="Optional — pick a goal or debt to automatically add this amount to its progress.">Apply toward <span style="font-weight:400;color:var(--bt-muted)">(optional)</span></label>
@@ -126,6 +144,9 @@
 <script>
   let btUid = null;
   let categoryManuallySet = false;
+  let splitAmounts = {}; // category -> $ amount, only meaningful once 2+ categories are selected
+  let scanLines = []; // raw OCR text lines from the most recent scan, for line-by-line category tagging
+  let lineCategoryTags = {}; // line index -> category, for the tagged/struck-through display state
 
   function toast(msg) {
     const el = document.getElementById("bt-toast");
@@ -168,17 +189,51 @@
     }).join("");
   }
 
+  function selectedCategories() {
+    return [...document.querySelectorAll("#f-category-chips .bt-chip--selected")].map((c) => c.dataset.value);
+  }
+
+  function renderCategoryChips() {
+    const wrap = document.getElementById("f-category-chips");
+    const current = new Set(selectedCategories());
+    wrap.innerHTML = BT_CONFIG.EXPENSE_CATEGORIES.map((c) =>
+      `<button type="button" class="bt-chip${current.has(c) ? " bt-chip--selected" : ""}" data-value="${btEscapeHtml(c)}">${btEscapeHtml(c)}</button>`
+    ).join("");
+    wrap.querySelectorAll(".bt-chip").forEach((chip) => {
+      chip.addEventListener("click", () => {
+        chip.classList.toggle("bt-chip--selected");
+        categoryManuallySet = true;
+        document.getElementById("category-hint").classList.remove("show");
+        onCategorySelectionChanged();
+      });
+    });
+  }
+
+  /** Selects one category chip — additive keeps whatever else is already selected (used when tagging scanned lines), non-additive clears the rest first (used for the initial scan/typed guess). */
+  function selectCategoryChip(category, additive) {
+    const chips = [...document.querySelectorAll("#f-category-chips .bt-chip")];
+    if (!additive) chips.forEach((c) => c.classList.remove("bt-chip--selected"));
+    const chip = chips.find((c) => c.dataset.value === category);
+    if (chip) chip.classList.add("bt-chip--selected");
+    onCategorySelectionChanged();
+  }
+
+  function onCategorySelectionChanged() {
+    updateLinkOptions();
+    renderSplitSection();
+  }
+
   function updateLinkOptions() {
-    const category = document.getElementById("f-category").value;
+    const cats = selectedCategories();
     const linkWrap = document.getElementById("link-wrap");
     const linkSel = document.getElementById("f-link");
     const store = btLoadStore(btUid);
 
-    if (category === BT_CONFIG.GOAL_LINK_CATEGORY && store.goals.length) {
+    if (cats.includes(BT_CONFIG.GOAL_LINK_CATEGORY) && store.goals.length) {
       linkWrap.style.display = "";
       linkSel.innerHTML = '<option value="">— none —</option>' + store.goals.map((g) => `<option value="${g.id}">${btEscapeHtml(g.description)}</option>`).join("");
       linkSel.dataset.kind = "goal";
-    } else if (category === BT_CONFIG.DEBT_LINK_CATEGORY && store.liabilities.length) {
+    } else if (cats.includes(BT_CONFIG.DEBT_LINK_CATEGORY) && store.liabilities.length) {
       linkWrap.style.display = "";
       linkSel.innerHTML = '<option value="">— none —</option>' + store.liabilities.map((l) => `<option value="${l.id}">${btEscapeHtml(l.debt_name)}</option>`).join("");
       linkSel.dataset.kind = "liability";
@@ -188,15 +243,51 @@
     }
   }
 
+  /** Only meaningful once 2+ categories are selected — one editable amount per category, defaulting to an even split of whatever isn't already assigned (e.g. by tagging scanned lines). */
+  function renderSplitSection() {
+    const cats = selectedCategories();
+    const wrap = document.getElementById("split-wrap");
+    if (cats.length < 2) { wrap.style.display = "none"; return; }
+    wrap.style.display = "";
+
+    Object.keys(splitAmounts).forEach((c) => { if (!cats.includes(c)) delete splitAmounts[c]; });
+    const total = parseFloat(document.getElementById("f-amount").value) || 0;
+    const unset = cats.filter((c) => splitAmounts[c] == null);
+    if (unset.length) {
+      const already = cats.reduce((s, c) => s + (splitAmounts[c] || 0), 0);
+      const share = Math.max(0, (total - already) / unset.length);
+      unset.forEach((c) => { splitAmounts[c] = Math.round(share * 100) / 100; });
+    }
+
+    document.getElementById("split-list").innerHTML = cats.map((c) => `
+      <div class="bt-field-row" style="align-items:center;margin-bottom:8px">
+        <div style="flex:1;font-size:0.85rem">${btEscapeHtml(c)}</div>
+        <div style="flex:none;width:110px"><input type="number" min="0" step="0.01" class="split-input" data-category="${btEscapeHtml(c)}" value="${splitAmounts[c].toFixed(2)}" /></div>
+      </div>
+    `).join("");
+    document.querySelectorAll(".split-input").forEach((el) => el.addEventListener("input", () => {
+      splitAmounts[el.dataset.category] = parseFloat(el.value) || 0;
+      updateSplitTotal();
+    }));
+    updateSplitTotal();
+  }
+
+  function updateSplitTotal() {
+    const total = parseFloat(document.getElementById("f-amount").value) || 0;
+    const allocated = Object.values(splitAmounts).reduce((s, v) => s + v, 0);
+    const el = document.getElementById("split-total");
+    el.textContent = `${fmtMoney(allocated)} of ${fmtMoney(total)}`;
+    el.style.color = Math.abs(allocated - total) > 0.01 ? "var(--bt-red)" : "var(--bt-green)";
+  }
+
   function tryAutoGuessCategory() {
     const desc = document.getElementById("f-desc").value;
     if (!desc.trim()) { categoryManuallySet = false; document.getElementById("category-hint").classList.remove("show"); return; }
     if (categoryManuallySet) return;
     const guess = btGuessCategory(desc);
     if (guess) {
-      document.getElementById("f-category").value = guess;
+      selectCategoryChip(guess, false);
       document.getElementById("category-hint").classList.add("show");
-      updateLinkOptions();
     }
   }
 
@@ -216,7 +307,7 @@
     });
   }
 
-  function showScanBubble(guessedCategory, guessedPaymentType, meta) {
+  function showScanBubble(guessedPaymentType, meta) {
     const bubble = document.getElementById("scan-bubble");
     const parts = [];
     if (meta.amount) parts.push(fmtMoney(meta.amount));
@@ -225,37 +316,72 @@
     if (guessedPaymentType) parts.push("· paid with " + guessedPaymentType);
     document.getElementById("bubble-summary").textContent = parts.length ? parts.join(" ") : "this bill";
 
-    buildChipRow("bubble-category-chips", BT_CONFIG.EXPENSE_CATEGORIES, guessedCategory, (category) => {
-      document.getElementById("f-category").value = category;
-      categoryManuallySet = true;
-      document.getElementById("category-hint").classList.remove("show");
-      updateLinkOptions();
-    });
     buildChipRow("bubble-payment-chips", BT_CONFIG.PAYMENT_TYPES, guessedPaymentType, (paymentType) => {
       document.getElementById("f-payment-type").value = paymentType;
     });
 
+    renderScanLines();
     bubble.classList.add("show");
   }
 
+  /** Lets a mixed receipt (groceries + household items, say) be split across categories: check the lines that belong together, tap a category to tag them — sums those lines' guessed amounts into that category's split and selects its chip. */
+  function renderScanLines() {
+    const wrap = document.getElementById("scan-lines-wrap");
+    if (!scanLines.length) { wrap.style.display = "none"; return; }
+    wrap.style.display = "";
+
+    document.getElementById("scan-lines-list").innerHTML = scanLines.map((line, i) => {
+      const tag = lineCategoryTags[i];
+      return `
+      <label class="scan-line-row${tag ? " scan-line-row--tagged" : ""}">
+        <input type="checkbox" class="scan-line-check" data-index="${i}" />
+        <span class="scan-line-text">${btEscapeHtml(line)}</span>
+        ${tag ? `<span class="bt-role-tag scan-line-tag">${btEscapeHtml(tag)}</span>` : ""}
+      </label>`;
+    }).join("");
+
+    const catWrap = document.getElementById("scan-lines-cat-chips");
+    catWrap.innerHTML = BT_CONFIG.EXPENSE_CATEGORIES.map((c) => `<button type="button" class="bt-chip" data-value="${btEscapeHtml(c)}">${btEscapeHtml(c)}</button>`).join("");
+    catWrap.querySelectorAll(".bt-chip").forEach((chip) => {
+      chip.addEventListener("click", () => tagCheckedLines(chip.dataset.value));
+    });
+  }
+
+  function tagCheckedLines(category) {
+    const checked = [...document.querySelectorAll(".scan-line-check:checked")].map((el) => parseInt(el.dataset.index, 10));
+    if (!checked.length) return toast("Tap a line first, then a category.");
+    let sum = 0;
+    checked.forEach((i) => {
+      lineCategoryTags[i] = category;
+      const amt = btGuessLineAmount(scanLines[i]);
+      if (amt) sum += amt;
+    });
+    if (sum > 0) splitAmounts[category] = Math.round(((splitAmounts[category] || 0) + sum) * 100) / 100;
+    selectCategoryChip(category, true);
+    renderScanLines();
+    renderSplitSection();
+  }
+
   function applyScanGuess(guess) {
-    const { amount, date, merchant, category, paymentType } = guess;
+    const { amount, date, merchant, category, paymentType, lines } = guess;
     if (amount) document.getElementById("f-amount").value = amount.toFixed(2);
     if (date) document.getElementById("f-date").value = date;
     if (merchant && !document.getElementById("f-desc").value.trim()) document.getElementById("f-desc").value = merchant;
     if (category) {
-      document.getElementById("f-category").value = category;
+      selectCategoryChip(category, false);
       categoryManuallySet = true; // trust the scan over further auto-guessing from the description field
     }
     if (paymentType) document.getElementById("f-payment-type").value = paymentType;
-    updateLinkOptions();
+
+    scanLines = lines || [];
+    lineCategoryTags = {};
 
     const statusEl = document.getElementById("scan-status");
     statusEl.classList.add("show");
     statusEl.textContent = amount
       ? "Image discarded — nothing was uploaded or saved. Double-check the details below before saving."
       : "Couldn't find a clear total — image discarded, fill in the amount yourself.";
-    showScanBubble(category, paymentType, { amount, merchant, date });
+    showScanBubble(paymentType, { amount, merchant, date });
   }
 
   async function handleScanFile(file) {
@@ -291,9 +417,8 @@
     btUid = window.btCurrentUserId = user.id;
 
     document.getElementById("f-date").value = new Date().toISOString().slice(0, 10);
-    const catSel = document.getElementById("f-category");
-    catSel.innerHTML = BT_CONFIG.EXPENSE_CATEGORIES.map((c) => `<option value="${c}">${c}</option>`).join("");
-    catSel.addEventListener("change", () => { categoryManuallySet = true; document.getElementById("category-hint").classList.remove("show"); updateLinkOptions(); });
+    renderCategoryChips();
+    document.getElementById("f-amount").addEventListener("input", renderSplitSection);
 
     document.getElementById("f-desc").addEventListener("input", tryAutoGuessCategory);
 
@@ -332,7 +457,7 @@
       sessionStorage.removeItem("bt_expense_prefill");
       try {
         const p = JSON.parse(prefill);
-        if (p.category) { document.getElementById("f-category").value = p.category; categoryManuallySet = true; }
+        if (p.category) { selectCategoryChip(p.category, false); categoryManuallySet = true; }
         updateLinkOptions();
         pendingLinkId = p.liability_id || p.goal_id || null;
         if (pendingLinkId) document.getElementById("f-link").value = pendingLinkId;
@@ -351,7 +476,7 @@
 
     document.getElementById("f-submit").addEventListener("click", () => {
       const notes = document.getElementById("f-desc").value.trim() || null;
-      const category = catSel.value;
+      const cats = selectedCategories();
       const amount = parseFloat(document.getElementById("f-amount").value);
       const expense_date = document.getElementById("f-date").value;
       const linkSel = document.getElementById("f-link");
@@ -360,14 +485,28 @@
       const payment_account = document.getElementById("f-payment-account").value.trim() || null;
 
       if (!notes) return toast("Say what this was for.");
+      if (!cats.length) return toast("Pick at least one category.");
       if (!amount || amount <= 0) return toast("Enter a valid amount.");
       if (!expense_date) return toast("Pick a date.");
 
-      const payload = { category, amount, expense_date, notes, goal_id: null, liability_id: null, payment_type, payment_account };
-      if (linkId && linkSel.dataset.kind === "goal") payload.goal_id = linkId;
-      if (linkId && linkSel.dataset.kind === "liability") payload.liability_id = linkId;
-
-      btAddExpense(btUid, payload);
+      if (cats.length === 1) {
+        const category = cats[0];
+        const payload = { category, amount, expense_date, notes, goal_id: null, liability_id: null, payment_type, payment_account };
+        if (linkId && linkSel.dataset.kind === "goal") payload.goal_id = linkId;
+        if (linkId && linkSel.dataset.kind === "liability") payload.liability_id = linkId;
+        btAddExpense(btUid, payload);
+      } else {
+        const allocated = cats.reduce((s, c) => s + (splitAmounts[c] || 0), 0);
+        if (Math.abs(allocated - amount) > 0.01) return toast("Split amounts don't add up to the total yet.");
+        cats.forEach((category) => {
+          const catAmount = splitAmounts[category] || 0;
+          if (catAmount <= 0) return;
+          const payload = { category, amount: catAmount, expense_date, notes, goal_id: null, liability_id: null, payment_type, payment_account };
+          if (linkId && linkSel.dataset.kind === "goal" && category === BT_CONFIG.GOAL_LINK_CATEGORY) payload.goal_id = linkId;
+          if (linkId && linkSel.dataset.kind === "liability" && category === BT_CONFIG.DEBT_LINK_CATEGORY) payload.liability_id = linkId;
+          btAddExpense(btUid, payload);
+        });
+      }
       renderRecent();
       refreshPaymentAccountSuggestions();
       toast(navigator.onLine ? "Expense saved" : "Saved offline — will sync automatically");
@@ -378,7 +517,7 @@
       if (libFile) {
         if (navigator.onLine) {
           btUploadDocument(btUid, libFile, {
-            doc_type: "bill", bank_name: null, category,
+            doc_type: "bill", bank_name: null, category: cats[0],
             amount, doc_date: expense_date, notes, income_id: null, expense_id: null
           }).then(() => toast("Receipt saved to Document Library"))
             .catch(() => toast("Expense saved, but the receipt didn't upload — try adding it from the Document Library."));
@@ -395,6 +534,11 @@
       document.getElementById("category-hint").classList.remove("show");
       hideScanBubble();
       categoryManuallySet = false;
+      splitAmounts = {};
+      scanLines = [];
+      lineCategoryTags = {};
+      document.querySelectorAll("#f-category-chips .bt-chip").forEach((c) => c.classList.remove("bt-chip--selected"));
+      renderSplitSection();
     });
 
     if ("serviceWorker" in navigator) {
