@@ -43,7 +43,7 @@ const BT_CONFIG = {
   GOAL_LINK_CATEGORY: "Savings & Investments",
   DEBT_LINK_CATEGORY: "Debt Repayment",
 
-  GOAL_CATEGORIES: ["Debt Reduction", "Investing", "Education", "Emergency Fund", "Critical Illness Fund", "Burial Fund", "Vacation Vault", "House Down Payment", "Investment Property Down Payment", "Car Down Payment", "Car Insurance", "Property Insurance", "Taxes", "Personal", "Other"],
+  GOAL_CATEGORIES: ["Debt Reduction", "Investing", "Education", "Emergency Fund", "Critical Illness Fund", "Burial Fund", "Vacation Vault", "Hajj / Umrah Fund", "House Down Payment", "Investment Property Down Payment", "Car Down Payment", "Car Insurance", "Property Insurance", "Taxes", "Personal", "Other"],
 
   /* Categories treated as "cost of living" — the baseline that has to keep
      running no matter what. Everything else (Personal, Education, Other)
@@ -150,6 +150,21 @@ const BT_CONFIG = {
     { key: "food", label: "Food & dining", low: 1000, high: 3000 },
     { key: "entertainment", label: "Entertainment & activities", low: 500, high: 2000 },
     { key: "travel", label: "Local travel / transport", low: 300, high: 1000 },
+    { key: "gifts", label: "Gifts & souvenirs", low: 300, high: 1000 }
+  ],
+
+  /* Hajj/Umrah Fund — a sub-fund alongside the Vacation Vault, itemized
+     for the specific costs of a pilgrimage trip rather than a typical
+     vacation. Same low/high + client-override pattern. */
+  HAJJ_UMRAH_ITEMS: [
+    { key: "airfare", label: "Airfare to Saudi Arabia", low: 3000, high: 8000 },
+    { key: "visa", label: "Visa & permit fees", low: 500, high: 1500 },
+    { key: "accommodation", label: "Accommodation (Mecca & Medina)", low: 3000, high: 8000 },
+    { key: "package", label: "Package / guide fees", low: 2000, high: 6000 },
+    { key: "ihram", label: "Ihram & other essentials", low: 200, high: 600 },
+    { key: "transport", label: "Ground transport & Ziyarat visits", low: 300, high: 1000 },
+    { key: "sacrifice", label: "Sacrifice / Qurbani", low: 300, high: 800 },
+    { key: "food", label: "Food & incidentals", low: 500, high: 1500 },
     { key: "gifts", label: "Gifts & souvenirs", low: 300, high: 1000 }
   ],
 

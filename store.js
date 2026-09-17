@@ -988,6 +988,24 @@ function btVacationVaultItemsTotal(profile) {
   return btVacationVaultItemValues(profile).reduce((s, it) => s + Number(it.value || 0), 0);
 }
 
+/** Typical low/high cost range across every Hajj/Umrah Fund line item. */
+function btHajjUmrahRange() {
+  const items = (typeof BT_CONFIG !== "undefined" && BT_CONFIG.HAJJ_UMRAH_ITEMS) || [];
+  return items.reduce((acc, it) => ({ low: acc.low + it.low, high: acc.high + it.high }), { low: 0, high: 0 });
+}
+
+/** Per-item Hajj/Umrah Fund estimate: the client's own saved figure if they've adjusted it, else the midpoint of that item's typical range. */
+function btHajjUmrahItemValues(profile) {
+  const items = (typeof BT_CONFIG !== "undefined" && BT_CONFIG.HAJJ_UMRAH_ITEMS) || [];
+  const overrides = profile?.hajj_umrah_estimates || {};
+  return items.map((it) => ({ ...it, value: overrides[it.key] ?? Math.round((it.low + it.high) / 2) }));
+}
+
+/** Hajj/Umrah Fund total — sum of the current per-item estimates (saved overrides or defaults). */
+function btHajjUmrahItemsTotal(profile) {
+  return btHajjUmrahItemValues(profile).reduce((s, it) => s + Number(it.value || 0), 0);
+}
+
 /**
  * Whether every base is covered: Emergency Fund, Critical Illness Fund,
  * and — for clients 50 and over — Burial Fund each have a linked goal

@@ -155,6 +155,21 @@
     <div class="prot-target" id="vv-target">—</div>
   </div>
 
+  <div class="bt-card" id="hu-card">
+    <h2 class="bf-toggle-head" id="hu-toggle" data-tip="A dedicated sub-fund alongside the Vacation Vault, for the specific costs of a Hajj or Umrah trip — airfare, visa, accommodation in Mecca and Medina, package/guide fees, Ihram and other essentials, ground transport, sacrifice, food, and gifts. Every line is your own estimate, adjustable. Click to expand or collapse.">🕋 Hajj/Umrah Fund <span class="bf-chevron" id="hu-chevron">▾</span></h2>
+    <p class="bt-sub" style="margin-bottom:10px">A dedicated sub-fund alongside the Vacation Vault for the specific costs of a pilgrimage trip, tracked separately from an ordinary vacation.</p>
+    <p class="bf-range" id="hu-range">—</p>
+    <div class="bf-total">
+      <span>Your estimated total</span>
+      <span class="amt" id="hu-items-total">—</span>
+    </div>
+    <div id="hu-goal-progress"></div>
+    <div class="bf-detail" id="hu-detail">
+      <div id="hu-items"></div>
+      <button class="bt-btn bt-btn--gold bt-btn--sm" id="hu-items-save" style="margin-top:16px">Save breakdown</button>
+    </div>
+  </div>
+
   <h2 class="prot-section-head">Insurance Renewals</h2>
   <p class="bt-sub">Car and property insurance usually come due once a year — track the renewal date here and spread the cost across the months leading up to it instead of finding it all at once.</p>
 
@@ -296,6 +311,33 @@
     const total = updateTotal();
     document.getElementById("vv-goal-progress").innerHTML = goalProgressHtml(btLoadStore(btUid), "Vacation Vault", total, currency)
       || `<p class="prot-note">Add a "Vacation Vault" goal from the Dashboard to start tracking what you've saved toward this.</p>`;
+  }
+
+  function renderHajjUmrahItems(profile, currency) {
+    const range = btHajjUmrahRange();
+    document.getElementById("hu-range").textContent = `Typical range: ${fmtMoney(range.low, currency)} – ${fmtMoney(range.high, currency)}`;
+
+    const items = btHajjUmrahItemValues(profile);
+    document.getElementById("hu-items").innerHTML = items.map((it) => `
+      <div class="bf-item">
+        <div>
+          <div class="bf-item-label">${it.label}</div>
+          <div class="bf-item-hint">typically ${fmtMoney(it.low, currency)} – ${fmtMoney(it.high, currency)}</div>
+        </div>
+        <input type="number" min="0" step="1" class="hu-item-input" data-key="${it.key}" value="${it.value}" />
+      </div>
+    `).join("");
+
+    const updateTotal = () => {
+      let total = 0;
+      document.querySelectorAll(".hu-item-input").forEach((el) => { total += parseFloat(el.value) || 0; });
+      document.getElementById("hu-items-total").textContent = fmtMoney(total, currency);
+      return total;
+    };
+    document.querySelectorAll(".hu-item-input").forEach((el) => el.addEventListener("input", updateTotal));
+    const total = updateTotal();
+    document.getElementById("hu-goal-progress").innerHTML = goalProgressHtml(btLoadStore(btUid), "Hajj / Umrah Fund", total, currency)
+      || `<p class="prot-note">Add a "Hajj / Umrah Fund" goal from the Dashboard to start tracking what you've saved toward this.</p>`;
   }
 
   function renderVacationVault(store) {
@@ -451,6 +493,7 @@
 
     renderBurialFund(profile, currency);
     renderVacationVault(store);
+    renderHajjUmrahItems(profile, currency);
     renderInsuranceRenewal("car", "Car Insurance", profile, store, currency);
     renderInsuranceRenewal("property", "Property Insurance", profile, store, currency);
   }
@@ -484,6 +527,17 @@
       const collapsed = document.getElementById("vv-detail").classList.toggle("collapsed");
       document.getElementById("vv-chevron").classList.toggle("collapsed", collapsed);
       localStorage.setItem(vvCollapseKey, collapsed ? "1" : "0");
+    });
+
+    const huCollapseKey = "bt_hu_collapsed_" + btUid;
+    if (localStorage.getItem(huCollapseKey) === "1") {
+      document.getElementById("hu-detail").classList.add("collapsed");
+      document.getElementById("hu-chevron").classList.add("collapsed");
+    }
+    document.getElementById("hu-toggle").addEventListener("click", () => {
+      const collapsed = document.getElementById("hu-detail").classList.toggle("collapsed");
+      document.getElementById("hu-chevron").classList.toggle("collapsed", collapsed);
+      localStorage.setItem(huCollapseKey, collapsed ? "1" : "0");
     });
 
     btWireScanFab("scan-fab-btn", "scan-fab-file");
@@ -542,6 +596,17 @@
       store = btLoadStore(btUid);
       renderAll(store);
       toast("Trip breakdown saved");
+    });
+
+    document.getElementById("hu-items-save").addEventListener("click", () => {
+      const estimates = {};
+      document.querySelectorAll(".hu-item-input").forEach((el) => {
+        estimates[el.dataset.key] = Math.max(0, parseFloat(el.value) || 0);
+      });
+      btUpdateProfile(btUid, { hajj_umrah_estimates: estimates });
+      store = btLoadStore(btUid);
+      renderAll(store);
+      toast("Hajj/Umrah breakdown saved");
     });
 
     ["car", "property"].forEach((kind) => {
