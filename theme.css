@@ -44,16 +44,19 @@ a { color: var(--bt-gold); }
 
 .bt-header {
   display: flex; align-items: center; justify-content: center;
-  gap: 10px;
-  padding: 22px 16px 14px; text-align: center;
+  gap: 10px; flex-wrap: wrap;
+  padding: 20px 16px 16px; text-align: center;
 }
 .bt-header--row { justify-content: space-between; text-align: left; }
-.bt-brand { display: flex; align-items: center; gap: 10px; }
-.bt-emblem { height: 44px; width: auto; display: block; }
+.bt-brand { display: flex; align-items: center; gap: 11px; }
+.bt-emblem {
+  height: 56px; width: auto; display: block;
+  filter: drop-shadow(0 2px 10px rgba(194, 145, 51, 0.35));
+}
 .bt-wordmark-stack { display: flex; flex-direction: column; gap: 3px; }
 .bt-wordmark-stack img { display: block; width: auto; }
-.bt-wordmark-title { height: 17px; }
-.bt-wordmark-sub { height: 9px; }
+.bt-wordmark-title { height: 19px; }
+.bt-wordmark-sub { height: 10px; }
 
 h1, h2, h3 { font-family: var(--bt-font-head); font-weight: 600; margin: 0 0 6px; letter-spacing: -0.01em; }
 h1 { font-size: 1.5rem; }
@@ -149,19 +152,23 @@ input:focus, select:focus, textarea:focus {
 .bt-bottom-nav {
   position: fixed; left: 0; right: 0; bottom: 0;
   display: flex; background: var(--bt-white); border-top: 1px solid var(--bt-border);
-  padding: 8px 8px calc(8px + env(safe-area-inset-bottom));
-  /* Deliberately very high — third-party overlays some hosts inject (e.g. a
-     platform attribution badge) can otherwise render on top of this bar and
-     silently swallow taps on it. Our own primary navigation should never
-     lose that fight. */
-  z-index: 2147483000;
+  padding: 10px 8px calc(10px + env(safe-area-inset-bottom));
+  /* The literal max 32-bit z-index — third-party overlays some hosts inject
+     (e.g. a platform attribution badge) can otherwise render on top of this
+     bar and silently swallow taps on it. Our own primary navigation should
+     never lose that fight, no matter what z-index such a badge claims. */
+  z-index: 2147483647;
 }
-.bt-bottom-nav a { flex: 1; text-align: center; padding: 6px 4px; font-size: 0.72rem; color: var(--bt-muted); text-decoration: none; font-weight: 600; }
+.bt-bottom-nav a {
+  flex: 1; text-align: center; padding: 10px 4px; min-height: 44px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.82rem; color: var(--bt-muted); text-decoration: none; font-weight: 600;
+}
 .bt-bottom-nav a.active { color: var(--bt-gold); }
 
 .bt-fab {
-  position: fixed; right: 18px; bottom: calc(78px + env(safe-area-inset-bottom)); z-index: 2147482999;
-  width: 56px; height: 56px; border-radius: 50%; border: none;
+  position: fixed; right: 18px; bottom: calc(84px + env(safe-area-inset-bottom)); z-index: 2147483646;
+  width: 60px; height: 60px; border-radius: 50%; border: none;
   background: var(--bt-gold); color: var(--bt-ink); font-size: 1.4rem;
   display: flex; align-items: center; justify-content: center; cursor: pointer;
   box-shadow: 0 4px 14px rgba(34,30,31,0.28);
