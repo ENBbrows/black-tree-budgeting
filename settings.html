@@ -102,7 +102,12 @@
 
     <div id="budgets-wrap" style="margin-top:16px;padding-top:14px;border-top:1px dashed var(--bt-border)">
       <label style="margin:0 0 8px" data-tip="Optional monthly ceiling per category. Leave blank for no limit. When you're close to or over one, it'll show up as a flag above and a color on Spending by Category. Each category also shows a Need/Want/Savings tag and a typical spend range based on your income, purely as a prompt — nothing is filled in or capped for you.">Category budgets <span style="font-weight:400;color:var(--bt-muted)">(optional)</span></label>
-      <div id="budgets-list"></div>
+      <div id="budgets-view"></div>
+      <button type="button" class="bt-btn bt-btn--ghost bt-btn--sm" id="budgets-toggle" style="margin-top:8px">Edit budgets</button>
+      <div id="budgets-form" style="display:none;margin-top:10px">
+        <div id="budgets-list"></div>
+        <button type="button" class="bt-btn bt-btn--gold bt-btn--sm" id="budgets-save" style="margin-top:10px">Save changes</button>
+      </div>
     </div>
 
     <div id="pw-wrap" style="margin-top:16px;padding-top:14px;border-top:1px dashed var(--bt-border)">
@@ -360,6 +365,16 @@
       </div>
     `;
     }).join("");
+  }
+
+  /** The at-a-glance view for Category budgets — just what's actually set, so re-opening Settings doesn't dump every category's blank input box in front of the ones you actually care about. */
+  function renderBudgetsView(store) {
+    const budgets = store.profile?.category_budgets || {};
+    const set = Object.entries(budgets).filter(([, v]) => v > 0);
+    document.getElementById("budgets-view").innerHTML = set.length
+      ? set.map(([cat, amt]) => `<div class="bt-list-row"><div>${btEscapeHtml(cat)}</div><div class="amt">${fmtHome(amt)}/mo</div></div>`).join("")
+      : '<div class="bt-empty">No budgets set yet.</div>';
+    document.getElementById("budgets-toggle").textContent = set.length ? "Edit budgets" : "Add budgets";
   }
 
   function refreshGoalCategoryOptions() {
@@ -727,6 +742,7 @@
     document.getElementById("pw-toggle").textContent = store.profile?.has_password ? "Change password" : "Set a password";
     renderFxRatesInputs(store);
     renderBudgetsInputs(store);
+    renderBudgetsView(store);
 
     const summary = btDashboardSummary(store, store.profile?.currency);
     renderDisposablePlan(store, summary);
@@ -845,7 +861,8 @@
     showTipsBox.checked = !btTipsHidden();
     showTipsBox.addEventListener("change", () => btSetTipsHidden(!showTipsBox.checked));
 
-    document.getElementById("s-save").addEventListener("click", () => {
+    /** Shared by the page-wide Save and the Category budgets block's own scoped Save — every field's current value goes up together either way, so re-saving from either button is harmless to the rest of the form. */
+    function saveAllSettings() {
       const full_name = document.getElementById("s-name").value.trim() || null;
       const curr = document.getElementById("s-currency").value.trim() || "TTD";
       const annualIncomeVal = parseFloat(document.getElementById("s-annual-income").value);
@@ -874,7 +891,23 @@
       });
       refreshGoalCategoryOptions();
       renderAll();
+      document.getElementById("budgets-form").style.display = "none";
+    }
+
+    document.getElementById("s-save").addEventListener("click", () => {
+      saveAllSettings();
       toast("Settings saved");
+    });
+
+    document.getElementById("budgets-toggle").addEventListener("click", () => {
+      const form = document.getElementById("budgets-form");
+      const opening = form.style.display === "none";
+      form.style.display = opening ? "" : "none";
+      if (opening) renderBudgetsInputs(btLoadStore(btUid));
+    });
+    document.getElementById("budgets-save").addEventListener("click", () => {
+      saveAllSettings();
+      toast("Budgets saved");
     });
 
     if ("serviceWorker" in navigator) {
