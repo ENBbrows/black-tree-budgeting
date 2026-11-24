@@ -1,11 +1,12 @@
 /* ═════════════════════════════════════════════════════════
-   BLACK TREE — field help bubbles.
+   BLACK TREE — help bubbles.
 
-   Any <label data-tip="..."> shows a small "?" and a dismissable
-   bubble on hover or click/focus of the field right after it. Each
-   bubble also carries a "Don't show these tips again" link that
-   turns tips off permanently on this device (localStorage, so it's
-   a per-device choice, same as everything else client-side here).
+   Any element carrying data-tip="..." (a field's <label>, a heading, a
+   small status button, whatever) shows a dismissable explanatory bubble
+   on hover or click. Each bubble also carries a "Don't show these tips
+   again" link that turns tips off permanently on this device
+   (localStorage, so it's a per-device choice, same as everything else
+   client-side here).
    ═════════════════════════════════════════════════════════ */
 (function () {
   const KEY = "bt_hide_tips";
@@ -62,13 +63,18 @@
     // up covering whatever's below it (a file picker, a submit button),
     // swallowing the next tap entirely. Hover and an explicit tap on the
     // label/"?" are asks; focus-to-type isn't.
-    document.querySelectorAll("label[data-tip]").forEach((label) => {
-      label.addEventListener("click", (e) => { e.preventDefault(); showBubble(label, label); });
-      label.addEventListener("mouseenter", () => showBubble(label, label));
+    // A <label> has no click action of its own, so a click is as good an
+    // ask as a hover and both show the bubble (useful on touch, which has
+    // no hover). Any other data-tip element — a button, a heading — likely
+    // does have its own click action, so only hover asks for the bubble;
+    // stealing its click would fight whatever that action is.
+    document.querySelectorAll("[data-tip]").forEach((el) => {
+      el.addEventListener("mouseenter", () => showBubble(el, el));
+      if (el.tagName === "LABEL") el.addEventListener("click", (e) => { e.preventDefault(); showBubble(el, el); });
     });
 
     document.addEventListener("click", (e) => {
-      if (!e.target.closest(".bt-tip-bubble") && !e.target.closest("label[data-tip]")) closeBubble();
+      if (!e.target.closest(".bt-tip-bubble") && !e.target.closest("[data-tip]")) closeBubble();
     });
     // Moving focus anywhere — tabbing on, typing into the next field —
     // closes a bubble left open from a label tap/hover, so it never lingers

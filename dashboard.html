@@ -29,6 +29,12 @@
   .bt-health-title { font-family: var(--bt-font-head); font-weight:700; font-size: 1.1rem; }
   .bt-health-sub { font-size: 0.85rem; margin-top: 2px; opacity: 0.85; }
 
+  .bt-status-btn-row { display:flex; gap:10px; flex-wrap:wrap; margin: 4px 0 6px; }
+  .bt-status-btn { display:inline-flex; align-items:center; gap:7px; background: var(--bt-white); border: 1px solid var(--bt-border); border-radius: 999px; padding: 9px 15px; font-size: 0.86rem; font-weight:600; font-family:inherit; color: var(--bt-ink); cursor:pointer; }
+  .bt-status-btn .chev { font-size:0.65rem; color:var(--bt-muted); transition: transform .2s; }
+  .bt-status-btn .chev.open { transform: rotate(180deg); }
+  .bt-status-detail { display:none; margin: 2px 0 16px; }
+  .bt-status-detail.open { display:block; }
   .bt-savings-chip { align-items:center; gap:10px; background: var(--bt-cream); border: 1px solid var(--bt-border); border-radius: 999px; padding: 8px 14px; margin: 4px 0 18px; width: fit-content; }
   .bt-savings-chip .pts { font-size: 0.86rem; font-weight: 600; white-space: nowrap; }
   .bt-savings-chip button { background: var(--bt-white); border: 1px solid var(--bt-border); border-radius: 50%; width: 32px; height: 32px; font-size: 1rem; line-height: 1; cursor: pointer; transition: transform .15s; }
@@ -80,18 +86,25 @@
     </div>
   </div>
 
-  <div class="bt-card" id="health-card">
-    <h2>Financial Health</h2>
+  <div class="bt-status-btn-row">
+    <button type="button" class="bt-status-btn" id="health-toggle" data-tip="Whether your spending, saving, and debt payments look on track right now — Green, Amber, or Red — based on your actual numbers, not a guess.">
+      <span id="health-btn-label">—</span><span class="chev">▾</span>
+    </button>
+    <button type="button" class="bt-status-btn" id="attention-toggle" data-tip="Specific things flagged from your real numbers — overspending, an insurance renewal coming up, extra room to pay down debt — worth a look, not necessarily a problem.">
+      <span id="attention-btn-label">—</span><span class="chev">▾</span>
+    </button>
+    <button type="button" class="bt-status-btn" id="timeline-toggle" data-tip="Goal deadlines, bills not yet marked paid this month, and an estimate of your next payday per income source — based on when you've been paid before.">
+      <span id="timeline-btn-label">—</span><span class="chev">▾</span>
+    </button>
+  </div>
+
+  <div class="bt-status-detail" id="health-detail">
     <div id="health-indicator"></div>
   </div>
-
-  <div class="bt-card" id="attention-card">
-    <h2>Needs Attention</h2>
+  <div class="bt-status-detail" id="attention-detail">
     <div id="attention-list"></div>
   </div>
-
-  <div class="bt-card" id="timeline-card">
-    <h2>What's Coming Up</h2>
+  <div class="bt-status-detail" id="timeline-detail">
     <div id="timeline-list"></div>
   </div>
 
@@ -281,8 +294,10 @@
     const level = overallHealthLevel(flags);
     const verdict = { red: "Action needed", yellow: "A few things need attention", green: "You're in good shape" }[level];
     const label = { red: "Red", yellow: "Amber", green: "Green" }[level];
+    const dotEmoji = { red: "🔴", yellow: "🟡", green: "🟢" }[level];
     const bg = { red: "var(--bt-red-bg)", yellow: "var(--bt-yellow-bg)", green: "var(--bt-green-bg)" }[level];
     const fg = { red: "var(--bt-red)", yellow: "var(--bt-yellow)", green: "var(--bt-green)" }[level];
+    document.getElementById("health-btn-label").textContent = `${dotEmoji} ${label}`;
     document.getElementById("health-indicator").innerHTML = `
       <div class="bt-health-banner" style="background:${bg};color:${fg}">
         <div class="bt-health-dot" style="background:${fg}"></div>
@@ -325,6 +340,7 @@
       bullets.push({ level: daysUntil < 0 ? "red" : "yellow", text });
     });
 
+    document.getElementById("attention-btn-label").textContent = bullets.length ? `⚠️ ${bullets.length} thing${bullets.length === 1 ? "" : "s"}` : "✅ All clear";
     const wrap = document.getElementById("attention-list");
     if (!bullets.length) { wrap.innerHTML = '<div class="bt-flag bt-flag--green"><span class="dot"></span><span>Nothing urgent — you\'re on track.</span></div>'; return; }
     wrap.innerHTML = bullets.map((f) => `<div class="bt-flag bt-flag--${f.level}"><span class="dot"></span><span>${f.text}</span></div>`).join("");
@@ -332,6 +348,7 @@
 
   function renderTimeline(store) {
     const items = btUpcomingTimeline(store);
+    document.getElementById("timeline-btn-label").textContent = items.length ? `📅 Next: ${items[0].label}` : "📅 Nothing upcoming";
     const wrap = document.getElementById("timeline-list");
     if (!items.length) { wrap.innerHTML = '<div class="bt-empty">Nothing on the horizon in the next 60 days.</div>'; return; }
     wrap.innerHTML = items.map((it) => `<div class="bt-list-row-plain"><span>${it.icon} ${btEscapeHtml(it.label)}</span><span style="color:var(--bt-muted)">${it.date}</span></div>`).join("");
@@ -625,6 +642,13 @@
     document.querySelectorAll("#view-toggle button").forEach((b) => {
       b.classList.toggle("active", b.dataset.mode === btViewMode);
       b.addEventListener("click", () => setViewMode(b.dataset.mode));
+    });
+
+    ["health", "attention", "timeline"].forEach((key) => {
+      document.getElementById(key + "-toggle").addEventListener("click", () => {
+        document.getElementById(key + "-detail").classList.toggle("open");
+        document.querySelector(`#${key}-toggle .chev`).classList.toggle("open");
+      });
     });
 
     document.getElementById("bt-logout").addEventListener("click", async () => { await btSignOut(); window.location.replace("login.html"); });
