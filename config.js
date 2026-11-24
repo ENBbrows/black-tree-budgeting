@@ -8,8 +8,8 @@
    Where to find these: Supabase dashboard → Project Settings → API.
    ═════════════════════════════════════════════════════════ */
 const BT_CONFIG = {
-  SUPABASE_URL: "https://txgzztcfsvwbbaagpuqz.supabase.co",
-  SUPABASE_ANON_KEY: "sb_publishable_s-F7IuwdzVxh29zpU04f3A_1aY1uztv",
+  SUPABASE_URL: "https://xyvsnpqajmrgvbtstzyu.supabase.co",
+  SUPABASE_ANON_KEY: "sb_publishable_8Gsq4BjXcP8VKJhg95kFlg_aFyIKUqA",
 
   BRAND_NAME: "Black Tree Investments",
   APP_NAME: "Black Tree Budgeting",
