@@ -1111,11 +1111,11 @@ function btProtectionFullyCovered(store, viewCurrency, profile) {
 }
 
 /**
- * Combined progress toward unlocking the Vacation Vault — Emergency Fund,
- * Critical Illness Fund, and (for clients 50+) Burial Fund, saved vs
- * target, added together. Each fund's contribution is capped at its own
- * target so overfunding one can't mask another sitting empty; pct only
- * reaches 100% exactly when btProtectionFullyCovered would also be true.
+ * Progress toward fully funding the other safety-net goals (Emergency Fund,
+ * Critical Illness Fund, and for clients 50+ Burial Fund) — shown on the
+ * Dashboard as encouragement, not a gate: the Vacation Vault itself is
+ * always open. Each fund's contribution is capped at its own target so
+ * overfunding one can't mask another sitting empty.
  */
 function btVacationVaultUnlockProgress(store, viewCurrency, profile) {
   const goals = btGoalProgress(store);
@@ -1134,7 +1134,7 @@ function btVacationVaultUnlockProgress(store, viewCurrency, profile) {
   return {
     pct: totalTarget > 0 ? Math.min(1, totalSaved / totalTarget) : 0,
     totalSaved, totalTarget, parts,
-    unlocked: btProtectionFullyCovered(store, viewCurrency, profile)
+    unlocked: true
   };
 }
 

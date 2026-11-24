@@ -84,11 +84,16 @@
     const modeSub = document.getElementById("bt-mode-sub");
     let passwordMode = false;
 
+    try {
+      const lastEmail = localStorage.getItem("bt_last_login_email");
+      if (lastEmail) emailEl.value = lastEmail;
+    } catch (e) {}
+
     function setMode(usePassword) {
       passwordMode = usePassword;
       passwordWrap.classList.toggle("show", passwordMode);
       btn.textContent = passwordMode ? "Sign in" : "Send secure link";
-      modeToggle.textContent = passwordMode ? "← Use a one-time email link instead" : "Have a password? Sign in directly →";
+      modeToggle.textContent = passwordMode ? "Forgot your password? Send a secure link instead" : "Have a password? Sign in directly →";
       modeSub.textContent = passwordMode
         ? "Sign in with the password you set from your Dashboard."
         : "First time, or haven't set a password yet? We'll email you a secure one-time link.";
@@ -96,6 +101,12 @@
       statusEl.className = "";
     }
     modeToggle.addEventListener("click", () => setMode(!passwordMode));
+
+    // Once this device has signed in with a password, default straight to
+    // password mode next time — no need to click the toggle every visit.
+    try {
+      if (localStorage.getItem("bt_login_mode") === "password") setMode(true);
+    } catch (e) {}
 
     async function submit() {
       const email = emailEl.value.trim();
@@ -114,6 +125,8 @@
       statusEl.textContent = "";
       statusEl.className = "";
 
+      try { localStorage.setItem("bt_last_login_email", email); } catch (e) {}
+
       if (passwordMode) {
         const password = passwordEl.value;
         if (!password) {
@@ -125,6 +138,7 @@
         btn.textContent = "Signing in…";
         try {
           await btSignInWithPassword(email, password);
+          try { localStorage.setItem("bt_login_mode", "password"); } catch (e) {}
           const params = new URLSearchParams(window.location.search);
           window.location.replace(params.get("redirect") || "dashboard.html");
         } catch (err) {

@@ -148,6 +148,20 @@
       <div id="budgets-list"></div>
     </div>
 
+    <div id="pw-wrap" style="margin-top:16px;padding-top:14px;border-top:1px dashed var(--bt-border)">
+      <label style="margin:0 0 8px">Password</label>
+      <p class="bt-sub" id="pw-status-text" style="margin-bottom:10px">—</p>
+      <button type="button" class="bt-btn bt-btn--ghost bt-btn--sm" id="pw-toggle">Change password</button>
+      <div id="pw-form" style="display:none;margin-top:10px">
+        <div class="bt-field-row">
+          <div><label for="pw-password">New password</label><input id="pw-password" type="password" autocomplete="new-password" placeholder="At least 8 characters" /></div>
+          <div><label for="pw-confirm">Confirm password</label><input id="pw-confirm" type="password" autocomplete="new-password" placeholder="Re-enter password" /></div>
+        </div>
+        <button type="button" class="bt-btn bt-btn--gold bt-btn--sm" id="pw-save" style="margin-top:10px">Save password</button>
+        <div id="pw-status" style="font-size:0.86rem;margin-top:8px;min-height:1.2em"></div>
+      </div>
+    </div>
+
     <button class="bt-btn bt-btn--ghost" id="s-save" style="margin-top:14px">Save settings</button>
 
     <label style="margin-top:20px;display:flex;align-items:center;gap:8px;font-weight:400;color:var(--bt-muted);cursor:pointer">
@@ -226,7 +240,7 @@
       <div class="bt-stat-grid" id="stats-week" style="grid-template-columns:1fr"></div>
     </div>
     <div class="bt-card bt-personal-only" id="vv-unlock-card">
-      <h2>🌴 Vacation Vault Unlock</h2>
+      <h2>🌴 Vacation Vault</h2>
       <p class="bt-sub" id="vv-unlock-sub" style="margin-bottom:10px">—</p>
       <div id="vv-unlock-graphic"></div>
       <div style="display:flex;justify-content:space-between;font-size:0.8rem;color:var(--bt-muted);margin-top:6px">
@@ -583,13 +597,14 @@
   function renderVacationVaultUnlock(store) {
     const prog = btVacationVaultUnlockProgress(store, viewCurrency, store.profile);
     const sub = document.getElementById("vv-unlock-sub");
-    if (prog.unlocked) {
-      sub.textContent = "🎉 Unlocked! Every base is covered — head to the Vacation Vault to set aside money for airfare, hotel stays, food, entertainment, travel, and gifts or souvenirs.";
+    const fullyCovered = prog.totalTarget > 0 && prog.totalSaved >= prog.totalTarget;
+    if (fullyCovered) {
+      sub.textContent = "🎉 Every safety-net fund is covered too — head to the Vacation Vault to set aside money for airfare, hotel stays, food, entertainment, travel, and gifts or souvenirs.";
       document.getElementById("vv-unlock-graphic").innerHTML = progressGraphic(1, "var(--bt-green)");
     } else {
-      sub.textContent = btBurialFundApplies(store.profile)
-        ? "Fully fund your Emergency Fund, Critical Illness Fund, and Burial Fund to unlock this reward."
-        : "Fully fund your Emergency Fund and Critical Illness Fund to unlock this reward.";
+      sub.textContent = "Open any time — head to the Vacation Vault to set aside money for your next trip. " + (btBurialFundApplies(store.profile)
+        ? "Fully funding your Emergency Fund, Critical Illness Fund, and Burial Fund first is still the safer order to save in."
+        : "Fully funding your Emergency Fund and Critical Illness Fund first is still the safer order to save in.");
       document.getElementById("vv-unlock-graphic").innerHTML = progressGraphic(prog.pct);
     }
     document.getElementById("vv-unlock-actual").textContent = fmtMoney(prog.totalSaved) + " saved";
@@ -684,26 +699,21 @@
         status: earned ? ("Settled" + (l.target_payoff_date ? " · target " + l.target_payoff_date : "")) : fmtPct(pct) + " paid off"
       });
     });
-    // Vacation Vault: dormant until the client has actually unlocked it (Emergency,
-    // Critical Illness, and Burial Fund all covered) — that's the "plugged in
-    // information" gate. Once active, it tracks the same way a goal does: any
-    // goal(s) filed under the "Vacation Vault" category, saved vs target. It's
-    // a standalone badge, separate from the per-goal badges above.
-    const vv = btVacationVaultUnlockProgress(store, viewCurrency, store.profile);
+    // Vacation Vault: always open — tracks the same way a goal does, any
+    // goal(s) filed under the "Vacation Vault" category, saved vs target.
+    // A standalone badge, separate from the per-goal badges above.
     const vaultGoals = btGoalProgress(store).filter((g) => g.category === "Vacation Vault");
     const vaultSaved = vaultGoals.reduce((s, g) => s + g.saved_amount, 0);
     const vaultTarget = vaultGoals.reduce((s, g) => s + g.target_amount, 0);
-    const vaultEarned = vv.unlocked && vaultTarget > 0 && vaultSaved >= vaultTarget;
+    const vaultEarned = vaultTarget > 0 && vaultSaved >= vaultTarget;
     badges.push({
       id: "vacation-vault", type: "vault", icon: "🌴", name: "Vacation Vault",
-      pct: vv.unlocked && vaultTarget > 0 ? Math.min(1, vaultSaved / vaultTarget) : 0,
+      pct: vaultTarget > 0 ? Math.min(1, vaultSaved / vaultTarget) : 0,
       earned: vaultEarned,
-      locked: !vv.unlocked,
-      status: !vv.unlocked
-        ? (btBurialFundApplies(store.profile) ? "Locked — cover your Emergency, Critical Illness & Burial Funds first" : "Locked — cover your Emergency & Critical Illness Funds first")
-        : vaultTarget > 0
-          ? (vaultEarned ? "Funded!" : fmtPct(vaultSaved / vaultTarget) + " there")
-          : "Active — add a Vacation Vault goal to start tracking"
+      locked: false,
+      status: vaultTarget > 0
+        ? (vaultEarned ? "Funded!" : fmtPct(vaultSaved / vaultTarget) + " there")
+        : "Active — add a Vacation Vault goal to start tracking"
     });
     return badges;
   }
@@ -1126,17 +1136,18 @@
       document.getElementById("s-vat-number").value = store.profile?.vat_number || "";
       renderAccountTypeChips(store.profile?.account_type || "personal");
       renderVatRegisteredChips(!!store.profile?.vat_registered);
+      document.getElementById("pw-status-text").textContent = store.profile?.has_password
+        ? "A password is set — you can sign in directly any time, no email wait."
+        : "No password set yet — you currently need a fresh emailed link each time you sign in.";
       renderFxRatesInputs(store);
       renderBudgetsInputs(store);
     }
   }
 
   /** Shows/hides every personal-only and business-only section based on the profile's account_type. Runs after the conditional personal cards above (debt/invest/insurance CTAs, Vacation Vault Unlock, Disposable Income Plan) so a business account's hide always wins, without the personal branch ever having to guess or override what those cards' own logic decided. */
+  /** Business is additive, not a replacement — a client running a business sees their personal sections and the Business Books link together on this one Dashboard. The Books page stays the dedicated business-only view for someone who just wants that on its own. */
   function applyAccountTypeUI(store) {
     const isBusiness = btIsBusinessAccount(store.profile);
-    if (isBusiness) {
-      document.querySelectorAll(".bt-personal-only").forEach((el) => { el.style.display = "none"; });
-    }
     document.querySelectorAll(".bt-business-only").forEach((el) => {
       el.style.display = isBusiness ? "" : "none";
     });
@@ -1285,28 +1296,48 @@
         document.getElementById("setpw-card").style.display = "none";
       });
 
-      document.getElementById("setpw-save").addEventListener("click", async () => {
-        const statusEl = document.getElementById("setpw-status");
-        const pw = document.getElementById("setpw-password").value;
-        const confirm = document.getElementById("setpw-confirm").value;
+      /** Shared by the one-time setup CTA and Settings' permanent "Change password" control — same validation, same btSetPassword() call either way. */
+      async function submitPasswordForm(pwId, confirmId, statusId, saveBtnId, savingLabel, idleLabel, onSuccess) {
+        const statusEl = document.getElementById(statusId);
+        const pw = document.getElementById(pwId).value;
+        const confirm = document.getElementById(confirmId).value;
         statusEl.textContent = ""; statusEl.className = "";
         if (pw.length < 8) { statusEl.textContent = "Password must be at least 8 characters."; statusEl.className = "err"; return; }
         if (pw !== confirm) { statusEl.textContent = "Passwords don't match."; statusEl.className = "err"; return; }
         if (!navigator.onLine) { statusEl.textContent = "You need a connection to set a password."; statusEl.className = "err"; return; }
-        const saveBtn = document.getElementById("setpw-save");
-        saveBtn.disabled = true; saveBtn.textContent = "Saving…";
+        const saveBtn = document.getElementById(saveBtnId);
+        saveBtn.disabled = true; saveBtn.textContent = savingLabel;
         try {
           await btSetPassword(pw);
           btUpdateProfile(btUid, { has_password: true });
-          document.getElementById("setpw-card").style.display = "none";
-          document.getElementById("setpw-password").value = "";
-          document.getElementById("setpw-confirm").value = "";
-          toast("Password set — you can now sign in directly, any time.");
+          document.getElementById(pwId).value = "";
+          document.getElementById(confirmId).value = "";
+          onSuccess();
         } catch (err) {
           statusEl.textContent = err.message || "Couldn't set password — try again.";
           statusEl.className = "err";
         }
-        saveBtn.disabled = false; saveBtn.textContent = "Set password";
+        saveBtn.disabled = false; saveBtn.textContent = idleLabel;
+      }
+
+      document.getElementById("setpw-save").addEventListener("click", () => {
+        submitPasswordForm("setpw-password", "setpw-confirm", "setpw-status", "setpw-save", "Saving…", "Set password", () => {
+          document.getElementById("setpw-card").style.display = "none";
+          document.getElementById("pw-status-text").textContent = "A password is set — you can sign in directly any time, no email wait.";
+          toast("Password set — you can now sign in directly, any time.");
+        });
+      });
+
+      document.getElementById("pw-toggle").addEventListener("click", () => {
+        document.getElementById("pw-form").style.display = document.getElementById("pw-form").style.display === "none" ? "" : "none";
+      });
+      document.getElementById("pw-save").addEventListener("click", () => {
+        submitPasswordForm("pw-password", "pw-confirm", "pw-status", "pw-save", "Saving…", "Save password", () => {
+          document.getElementById("pw-form").style.display = "none";
+          document.getElementById("pw-status-text").textContent = "A password is set — you can sign in directly any time, no email wait.";
+          document.getElementById("setpw-card").style.display = "none";
+          toast("Password updated.");
+        });
       });
 
       document.getElementById("b-submit").addEventListener("click", () => {
@@ -1383,6 +1414,11 @@
         });
         refreshGoalCategoryOptions();
         renderAll();
+        // Saving is the explicit "I'm done for now" signal — collapse
+        // right away instead of waiting for a reload to notice settings
+        // are filled in, so Save visibly confirms it took.
+        applySettingsCollapse(true);
+        localStorage.setItem(settingsCollapseKey, "1");
         toast("Settings saved");
       });
     }
