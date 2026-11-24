@@ -35,6 +35,9 @@
   .scan-line-row input[type="checkbox"] { width: auto; flex: none; }
   .scan-line-text { flex: 1; word-break: break-word; }
   .scan-line-tag { flex: none; background: var(--bt-gold); color: #fff; }
+  .bt-section-head { display:flex; align-items:center; justify-content:space-between; margin: 26px 0 10px; }
+  .bt-mini-form { display:none; margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--bt-border); }
+  .bt-mini-form.show { display:block; }
 </style>
 </head>
 <body>
@@ -55,6 +58,26 @@
     <span id="bt-net-badge" class="bt-badge bt-badge--online">Online</span>
   </div>
   <p class="bt-sub">Say what it was and how much — we'll sort out the category. Saves instantly, even with no signal.</p>
+
+  <div class="bt-card" id="bills-card">
+    <div class="bt-section-head" style="margin:0 0 6px">
+      <h2>Bills This Month</h2>
+      <button class="bt-btn bt-btn--ghost bt-btn--sm" id="toggle-bill-form">+ Add bill</button>
+    </div>
+    <p class="bt-sub" style="margin-bottom:10px">Set up a bill once, then mark it paid each month in one tap — logs it as an expense for you.</p>
+    <div id="bills-list"><div class="bt-empty">No recurring bills set up yet.</div></div>
+    <div class="bt-mini-form" id="bill-form">
+      <label data-tip="e.g. &quot;Rent&quot;, &quot;Phone plan&quot;, &quot;Netflix&quot;.">Bill name</label>
+      <input id="b-name" type="text" placeholder="e.g. Rent" />
+      <div class="bt-field-row">
+        <div><label data-tip="What category this bill falls under.">Category</label><select id="b-category"></select></div>
+        <div><label data-tip="The usual amount, e.g. 2000.00.">Amount</label><input id="b-amount" type="number" min="0" step="0.01" /></div>
+      </div>
+      <label data-tip="Which day of the month it's usually due (1–28). Just for sorting the list, doesn't set a reminder.">Day of month due</label>
+      <input id="b-day" type="number" min="1" max="28" value="1" />
+      <button class="bt-btn bt-btn--gold" id="b-submit" style="margin-top:14px">Save bill</button>
+    </div>
+  </div>
 
   <button class="bt-btn bt-btn--ghost" id="scan-btn" style="margin-bottom:8px">📷 Scan a bill or receipt</button>
   <input type="file" id="scan-file" accept="image/*" capture="environment" style="display:none" />
@@ -142,10 +165,10 @@
 <div class="bt-toast" id="bt-toast"></div>
 
 <nav class="bt-bottom-nav">
-  <a href="income.html">Income</a>
-  <a href="expense.html" class="active">Expense</a>
-  <a href="library.html">Library</a>
   <a href="dashboard.html">Dashboard</a>
+  <a href="expense.html" class="active">Expenses</a>
+  <a href="settings.html">Settings</a>
+  <a href="library.html">Library</a>
 </nav>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
@@ -431,6 +454,37 @@
     }
   }
 
+  /** Bills This Month — set up once in the form below, then "Mark paid" logs it straight as an expense (bill_id links it back so it won't show as due again this month). */
+  function renderBills() {
+    const store = btLoadStore(btUid);
+    const bills = btBillsStatus(store);
+    const wrap = document.getElementById("bills-list");
+    if (!bills.length) { wrap.innerHTML = '<div class="bt-empty">No recurring bills set up yet.</div>'; return; }
+    wrap.innerHTML = bills.map((b) => `
+      <div class="bt-bill-item">
+        <div>
+          <div>${btEscapeHtml(b.name)}${b._pending ? '<span class="bt-pending-dot" title="Syncing"></span>' : ""}</div>
+          <div class="meta">${b.category} · due day ${b.day_of_month} · ${fmtMoney(b.amount)}</div>
+        </div>
+        ${b.paidThisMonth
+          ? '<span class="bt-badge bt-badge--online">✓ Paid</span>'
+          : `<button class="bt-btn bt-btn--gold bt-btn--sm bill-pay-btn" data-bill="${b.id}" data-category="${b.category}" data-amount="${b.amount}">Mark paid</button>`}
+      </div>
+    `).join("");
+    wrap.querySelectorAll(".bill-pay-btn").forEach((btn) => btn.addEventListener("click", () => {
+      btAddExpense(btUid, {
+        category: btn.dataset.category,
+        amount: parseFloat(btn.dataset.amount),
+        expense_date: new Date().toISOString().slice(0, 10),
+        bill_id: btn.dataset.bill,
+        goal_id: null, liability_id: null, notes: "Recurring bill"
+      });
+      renderRecent();
+      renderBills();
+      toast("Marked paid");
+    }));
+  }
+
   function paymentAccountSuggestions(store) {
     const names = new Set();
     [...store.income, ...store.expenses].forEach((e) => { if (e.payment_account) names.add(e.payment_account); });
@@ -519,6 +573,23 @@
 
     document.getElementById("f-desc").addEventListener("input", tryAutoGuessCategory);
 
+    document.getElementById("b-category").innerHTML = BT_CONFIG.EXPENSE_CATEGORIES.map((c) => `<option value="${c}">${c}</option>`).join("");
+    document.getElementById("toggle-bill-form").addEventListener("click", () => document.getElementById("bill-form").classList.toggle("show"));
+    document.getElementById("b-submit").addEventListener("click", () => {
+      const name = document.getElementById("b-name").value.trim();
+      const category = document.getElementById("b-category").value;
+      const amount = parseFloat(document.getElementById("b-amount").value);
+      const day_of_month = Math.max(1, Math.min(28, parseInt(document.getElementById("b-day").value, 10) || 1));
+      if (!name) return toast("Enter a bill name.");
+      if (!amount || amount <= 0) return toast("Enter a valid amount.");
+      btAddBill(btUid, { name, category, amount, day_of_month, active: true });
+      document.getElementById("b-name").value = ""; document.getElementById("b-amount").value = ""; document.getElementById("b-day").value = "1";
+      document.getElementById("bill-form").classList.remove("show");
+      renderBills();
+      toast("Bill saved");
+    });
+    renderBills();
+
     const paymentSel = document.getElementById("f-payment-type");
     paymentSel.innerHTML = '<option value="">— not specified —</option>' + BT_CONFIG.PAYMENT_TYPES.map((p) => `<option value="${p}">${p}</option>`).join("");
     const lastPaymentType = localStorage.getItem("bt_last_payment_type");
@@ -569,6 +640,7 @@
     btSync(btUid).then(() => {
       renderRecent(); updateLinkOptions(); refreshPaymentAccountSuggestions();
       renderCategoryChips(); renderVatChips(); populateProjectOptions();
+      renderBills();
       if (pendingLinkId) document.getElementById("f-link").value = pendingLinkId;
     });
 

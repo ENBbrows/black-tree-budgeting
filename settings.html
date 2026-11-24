@@ -1,0 +1,894 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Settings — Black Tree</title>
+<link rel="apple-touch-icon" href="assets/icon-180.png">
+<link rel="icon" href="assets/icon-32.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#FAF7F2">
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="theme.css" />
+<style>
+  #pw-status.err { color: var(--bt-red); }
+  .bt-role-tag { font-size:0.68rem; text-transform:uppercase; letter-spacing:0.03em; padding:3px 8px; border-radius:999px; font-weight:700; }
+  .bt-section-head { display:flex; align-items:center; justify-content:space-between; margin: 26px 0 10px; }
+  .bt-mini-form { display:none; margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--bt-border); }
+  .bt-mini-form.show { display:block; }
+  .bt-goal-item, .bt-debt-item { padding: 14px 0; border-bottom: 1px solid var(--bt-border); }
+  .bt-goal-item:last-child, .bt-debt-item:last-child { border-bottom:none; }
+  .bt-goal-item .row1, .bt-debt-item .row1 { display:flex; justify-content:space-between; font-size:0.92rem; margin-bottom:6px; }
+  .bt-goal-item .meta, .bt-debt-item .meta { font-size:0.78rem; color:var(--bt-muted); margin-top:6px; }
+  .bt-goal-adjust-btn { background:none; border:none; padding:0; margin-left:8px; color: var(--bt-gold); font-family: inherit; font-size: 0.78rem; cursor:pointer; text-decoration: underline; }
+  .bt-goal-adjust-form { display:none; margin-top:10px; padding-top:10px; border-top:1px dashed var(--bt-border); }
+  .bt-goal-adjust-form.show { display:block; }
+  .bt-progress--debt { position: relative; }
+  .bt-progress--debt .bt-progress-debt-fill { position: absolute; inset: 0; border-radius: 999px; background: linear-gradient(90deg, var(--bt-red) 0%, var(--bt-yellow) 50%, var(--bt-green) 100%); }
+  .bt-badges-grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 14px; }
+  .bt-badge-card { text-align:center; background: var(--bt-white); border:1px solid var(--bt-border); border-radius: 14px; padding: 16px 10px; transition: box-shadow .4s, border-color .4s; }
+  .bt-badge-card.earned { box-shadow: 0 0 18px 3px rgba(194,145,51,0.5); border-color: var(--bt-gold); }
+  .bt-badge-card.locked { opacity: 0.6; }
+  .bt-badge-ring { width: 62px; height: 62px; border-radius: 50%; margin: 0 auto 8px; position: relative; }
+  .bt-badge-ring::after { content:""; position:absolute; inset: 6px; border-radius:50%; background: var(--bt-white); }
+  .bt-badge-ring .icon-inner { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:1.6rem; z-index:1; }
+  .bt-debt-power-wrap { height: 62px; display:flex; align-items:center; justify-content:center; margin: 0 auto 8px; }
+  .bt-debt-power { width: 56px; height: 14px; border-radius: 7px; background: var(--bt-border); position: relative; overflow: hidden; flex-shrink:0; }
+  .bt-debt-power .fill { position:absolute; inset:0; border-radius:7px; background: linear-gradient(90deg, var(--bt-red) 0%, var(--bt-yellow) 50%, var(--bt-green) 100%); }
+  .bt-badge-card .name { font-size: 0.82rem; font-weight:600; margin-bottom:4px; }
+  .bt-badge-card .status { font-size: 0.72rem; color: var(--bt-muted); }
+  .bt-badge-card.earned .status { color: var(--bt-green); font-weight:600; }
+  .bt-progress { height: 8px; border-radius: 999px; background: var(--bt-border); overflow: hidden; }
+  .bt-progress > div { height: 100%; border-radius: 999px; }
+</style>
+</head>
+<body>
+<div class="bt-header bt-header--row">
+  <div class="bt-brand">
+    <img src="assets/emblem-gold.png" alt="" class="bt-emblem">
+    <div class="bt-wordmark-stack">
+      <img src="assets/wordmark-top-gold.png" alt="Black Tree" class="bt-wordmark-title">
+      <img src="assets/wordmark-bottom-gold.png" alt="Investments" class="bt-wordmark-sub">
+    </div>
+  </div>
+  <button class="bt-btn bt-btn--ghost bt-btn--sm" id="bt-logout">Log out</button>
+</div>
+
+<div class="bt-container bt-container--wide">
+  <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px">
+    <h1>Settings</h1>
+    <span id="bt-net-badge" class="bt-badge bt-badge--online">Online</span>
+  </div>
+  <p class="bt-sub" style="margin-bottom:20px">Everything you set up once and come back to occasionally — account details, income, goals, debts, and your plans. Day-to-day spending lives on Expenses instead.</p>
+
+  <div class="bt-card" id="settings-card">
+    <h2>Account</h2>
+    <label data-tip="Personal: budgeting, goals, and protection planning for yourself. Business: a small-business bookkeeping mode instead — Income/Expense use business categories, plus a Profit &amp; Loss and VAT summary. Switch any time; nothing is deleted either way.">Account type</label>
+    <div class="bt-chip-row" id="s-account-type-chips"></div>
+
+    <label data-tip="How you'd like to be greeted on your Dashboard, e.g. &quot;Amii&quot; or &quot;Amii Leroux&quot;.">Full name</label>
+    <input id="s-name" type="text" />
+    <div class="bt-field-row">
+      <div><label data-tip="The currency label shown next to your numbers, e.g. TTD, USD.">Currency</label><input id="s-currency" type="text" maxlength="6" /></div>
+      <div class="bt-personal-only"><label data-tip="Your gross annual income. Once set, this becomes the one fixed figure your Emergency Fund, Critical Illness Fund, Life Insurance, and Retirement Target all calculate from — instead of an estimate that shifts as you log more income through the year. Leave blank to keep using that estimate.">Annual income <span style="font-weight:400;color:var(--bt-muted)">(optional)</span></label><input id="s-annual-income" type="number" min="0" step="0.01" /></div>
+    </div>
+    <div class="bt-field-row bt-personal-only">
+      <div><label data-tip="How many people your income supports (yourself included) — just a headcount, used to give the Cost of Living figures context. Doesn't affect any calculation.">Dependents</label><input id="s-dependents" type="number" min="0" step="1" /></div>
+      <div><label data-tip="Used only to unlock the Burial Fund section of the Protection Planner once you turn 50 — it isn't shown before then.">Date of birth <span style="font-weight:400;color:var(--bt-muted)">(optional)</span></label><input id="s-dob" type="date" /></div>
+    </div>
+
+    <div class="bt-business-only" id="business-fields-wrap" style="display:none">
+      <label data-tip="Shown on your Books page and any export — the business this bookkeeping belongs to.">Business name</label>
+      <input id="s-business-name" type="text" placeholder="e.g. Leroux Contracting" />
+      <div class="bt-field-row">
+        <div>
+          <label data-tip="Turn on if you're VAT-registered with the Board of Inland Revenue. This just changes what the VAT summary on your Books page shows — it doesn't register you for anything.">VAT registered</label>
+          <div class="bt-chip-row" id="s-vat-registered-chips"></div>
+        </div>
+        <div><label data-tip="T&amp;T's standard VAT rate at time of writing is 12.5% — editable here since tax law changes. Used only as a default when logging a standard-rated entry; your own figure always wins. Confirm actual filing treatment with a licensed accountant.">VAT rate %</label><input id="s-vat-rate" type="number" min="0" step="0.01" /></div>
+      </div>
+      <label data-tip="Optional — your BIR VAT registration number, shown on your Books page for your own reference.">VAT number <span style="font-weight:400;color:var(--bt-muted)">(optional)</span></label>
+      <input id="s-vat-number" type="text" />
+      <p class="bt-sub" style="margin:8px 0 0;font-size:0.76rem">Books figures are for your own records and your accountant's use — not a substitute for their review or the actual filing.</p>
+    </div>
+
+    <div id="fx-rates-wrap" style="margin-top:16px;padding-top:14px;border-top:1px dashed var(--bt-border)">
+      <label style="margin:0 0 8px" data-tip="Manual exchange rates for any foreign currency you log income in — set once, updated whenever you like. Nothing is fetched automatically, so this keeps working offline.">Exchange rates</label>
+      <div id="fx-rates-list"></div>
+    </div>
+
+    <div id="budgets-wrap" style="margin-top:16px;padding-top:14px;border-top:1px dashed var(--bt-border)">
+      <label style="margin:0 0 8px" data-tip="Optional monthly ceiling per category. Leave blank for no limit. When you're close to or over one, it'll show up as a flag above and a color on Spending by Category. Each category also shows a Need/Want/Savings tag and a typical spend range based on your income, purely as a prompt — nothing is filled in or capped for you.">Category budgets <span style="font-weight:400;color:var(--bt-muted)">(optional)</span></label>
+      <div id="budgets-list"></div>
+    </div>
+
+    <div id="pw-wrap" style="margin-top:16px;padding-top:14px;border-top:1px dashed var(--bt-border)">
+      <label style="margin:0 0 8px">Password</label>
+      <p class="bt-sub" id="pw-status-text" style="margin-bottom:10px">—</p>
+      <button type="button" class="bt-btn bt-btn--ghost bt-btn--sm" id="pw-toggle">Change password</button>
+      <div id="pw-form" style="display:none;margin-top:10px">
+        <div class="bt-field-row">
+          <div><label for="pw-password">New password</label><input id="pw-password" type="password" autocomplete="new-password" placeholder="At least 8 characters" /></div>
+          <div><label for="pw-confirm">Confirm password</label><input id="pw-confirm" type="password" autocomplete="new-password" placeholder="Re-enter password" /></div>
+        </div>
+        <button type="button" class="bt-btn bt-btn--gold bt-btn--sm" id="pw-save" style="margin-top:10px">Save password</button>
+        <div id="pw-status" style="font-size:0.86rem;margin-top:8px;min-height:1.2em"></div>
+      </div>
+    </div>
+
+    <button class="bt-btn bt-btn--ghost" id="s-save" style="margin-top:14px">Save settings</button>
+
+    <label style="margin-top:20px;display:flex;align-items:center;gap:8px;font-weight:400;color:var(--bt-muted);cursor:pointer">
+      <input type="checkbox" id="s-show-tips" style="width:auto" /> Show help bubbles on form fields
+    </label>
+  </div>
+
+  <div class="bt-card" id="income-card">
+    <h2>💰 Log Income</h2>
+    <label for="inc-source" data-tip="What this money is from — your job, a side hustle, rental income, whatever fits. Type anything, or pick a suggestion.">Income source</label>
+    <input id="inc-source" type="text" list="inc-source-suggestions" placeholder="e.g. Salary / Primary Job" />
+    <datalist id="inc-source-suggestions"></datalist>
+
+    <div id="inc-biz-fields" style="display:none">
+      <label data-tip="Which revenue stream this payment belongs to, for your Profit &amp; Loss.">Category</label>
+      <div class="bt-chip-row" id="inc-category-chips"></div>
+      <label data-tip="Was VAT charged on this sale? Pick the treatment, then confirm the VAT portion of the amount above.">VAT treatment</label>
+      <div class="bt-chip-row" id="inc-vat-chips"></div>
+      <div class="bt-field-row">
+        <div><label data-tip="The VAT portion of the amount above (not an extra charge on top) — only relevant for a standard-rated sale.">VAT amount</label><input id="inc-vat-amount" type="number" min="0" step="0.01" placeholder="0.00" /></div>
+        <div>
+          <label for="inc-project" data-tip="Optional — tag this to a specific contract/job to see its own profitability on the Books page.">Project <span style="font-weight:400;color:var(--bt-muted)">(optional)</span></label>
+          <select id="inc-project"><option value="">— none —</option></select>
+        </div>
+      </div>
+    </div>
+
+    <div class="bt-field-row">
+      <div><label for="inc-amount" data-tip="The amount you actually received, in whichever currency you were paid in.">Amount</label><input id="inc-amount" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0.00" /></div>
+      <div><label for="inc-currency" data-tip="Pick the currency this payment was actually in.">Currency</label><select id="inc-currency"></select></div>
+    </div>
+    <div class="bt-field-row">
+      <div><label for="inc-frequency" data-tip="How often this source usually comes in — just for reference.">Frequency</label><select id="inc-frequency"></select></div>
+      <div><label for="inc-date" data-tip="The date you got paid. Defaults to today.">Date received</label><input id="inc-date" type="date" /></div>
+    </div>
+    <label for="inc-notes" data-tip="Anything extra worth remembering. Totally optional.">Notes <span style="font-weight:400;color:var(--bt-muted)">(optional)</span></label>
+    <input id="inc-notes" type="text" />
+    <div class="bt-field-row">
+      <div><label for="inc-payment-type" data-tip="How this money reached you — cash, deposited to a card/account, cheque, etc.">Received via <span style="font-weight:400;color:var(--bt-muted)">(optional)</span></label><select id="inc-payment-type"><option value="">— not specified —</option></select></div>
+      <div><label for="inc-payment-account" data-tip="Optional — which account it landed in.">Account <span style="font-weight:400;color:var(--bt-muted)">(optional)</span></label><input id="inc-payment-account" type="text" list="inc-payment-account-suggestions" /><datalist id="inc-payment-account-suggestions"></datalist></div>
+    </div>
+    <button class="bt-btn bt-btn--gold" id="inc-submit" style="margin-top:18px">Save income</button>
+  </div>
+
+  <div class="bt-card" id="goals-card">
+    <div class="bt-section-head" style="margin:0 0 6px">
+      <h2>Goals</h2>
+      <button class="bt-btn bt-btn--ghost bt-btn--sm" id="toggle-goal-form">+ Add goal</button>
+    </div>
+    <div id="goals-list"><div class="bt-empty">No goals yet.</div></div>
+    <div class="bt-mini-form" id="goal-form">
+      <label data-tip="A short name for what you're saving toward, e.g. &quot;Vacation Fund&quot;.">Description</label>
+      <input id="g-desc" type="text" placeholder="e.g. Vacation Fund" />
+      <label data-tip="Roughly what kind of goal this is.">Category</label>
+      <select id="g-category"></select>
+      <div class="bt-field-row">
+        <div><label data-tip="The total you're aiming to save.">Target amount</label><input id="g-target" type="number" min="0" step="0.01" /></div>
+        <div><label data-tip="If you'd already put money aside for this before using the tracker, enter it here as a starting point.">Already saved</label><input id="g-opening" type="number" min="0" step="0.01" value="0" /></div>
+      </div>
+      <label data-tip="Optional — when you'd like to reach this goal by.">Target date <span style="font-weight:400;color:var(--bt-muted)">(optional)</span></label>
+      <input id="g-date" type="date" />
+      <button class="bt-btn bt-btn--gold" id="g-submit" style="margin-top:14px">Save goal</button>
+    </div>
+  </div>
+
+  <div class="bt-card" id="debts-card">
+    <div class="bt-section-head" style="margin:0 0 6px">
+      <h2>Debt Tracker</h2>
+      <button class="bt-btn bt-btn--ghost bt-btn--sm" id="toggle-debt-form">+ Add debt</button>
+    </div>
+    <p class="bt-sub" style="margin-bottom:10px" data-tip="Highest interest rate first — the debt avalanche method. Debts with no rate entered are listed last.">Sorted by interest rate — highest first, to pay off first.</p>
+    <div id="debts-list"><div class="bt-empty">No debts tracked.</div></div>
+    <div class="bt-mini-form" id="debt-form">
+      <label data-tip="e.g. &quot;Car Loan&quot; or &quot;Credit Card&quot;.">Debt name</label>
+      <input id="d-name" type="text" placeholder="e.g. Car Loan" />
+      <label data-tip="Optional — who you owe.">Lender <span style="font-weight:400;color:var(--bt-muted)">(optional)</span></label>
+      <input id="d-lender" type="text" />
+      <div class="bt-field-row">
+        <div><label data-tip="What you currently owe, as of your latest statement.">Current balance owed</label><input id="d-balance" type="number" min="0" step="0.01" /></div>
+        <div><label data-tip="Optional — the annual interest rate, if you know it.">Interest rate % <span style="font-weight:400">(optional)</span></label><input id="d-rate" type="number" min="0" step="0.01" /></div>
+      </div>
+      <label data-tip="Optional — your minimum required payment.">Minimum payment <span style="font-weight:400;color:var(--bt-muted)">(optional)</span></label>
+      <input id="d-min" type="number" min="0" step="0.01" />
+      <label data-tip="Optional — when you'd like this debt fully paid off.">Target payoff date <span style="font-weight:400;color:var(--bt-muted)">(optional)</span></label>
+      <input id="d-date" type="date" />
+      <button class="bt-btn bt-btn--gold" id="d-submit" style="margin-top:14px">Save debt</button>
+    </div>
+  </div>
+
+  <div class="bt-card bt-personal-only" id="dip-card" style="display:none">
+    <h2 data-tip="A suggested order to put this month's leftover money to work, based on your actual numbers. Every figure is yours to change; nothing here is saved automatically.">💡 Disposable Income Plan</h2>
+    <p class="bt-sub" id="dip-sub" style="margin-bottom:10px">—</p>
+    <div id="dip-list"></div>
+    <div style="display:flex;justify-content:space-between;font-size:0.85rem;margin-top:10px;padding-top:10px;border-top:1px solid var(--bt-border)">
+      <span>Allocated</span><span id="dip-total">—</span>
+    </div>
+  </div>
+
+  <div class="bt-quick-actions">
+    <a href="statement.html" class="bt-btn bt-btn--ghost">📄 3-Month Cash Flow Statement</a>
+  </div>
+  <div class="bt-quick-actions bt-personal-only">
+    <a href="protection.html" class="bt-btn bt-btn--ghost">🛡️ Protection &amp; Retirement Planner</a>
+  </div>
+  <div class="bt-quick-actions bt-business-only" style="display:none">
+    <a href="books.html" class="bt-btn bt-btn--ghost">📊 Business Books (P&amp;L &amp; VAT)</a>
+  </div>
+
+  <div class="bt-card bt-personal-only" id="badges-card">
+    <h2>🏆 Achievements</h2>
+    <p class="bt-sub" style="margin-bottom:14px">Each badge fills in with your progress and lights up fully once it's earned — one for every goal reached, one for every debt settled, and one for the Vacation Vault once it's funded.</p>
+    <div class="bt-badges-grid" id="badges-grid"></div>
+  </div>
+
+  <p class="bt-sub" style="text-align:center"><a href="setup-guide.html">Add these to your home screen →</a></p>
+  <p class="bt-sub" style="text-align:center"><a href="privacy.html">🔒 Privacy &amp; security →</a></p>
+</div>
+
+<div class="bt-toast" id="bt-toast"></div>
+
+<nav class="bt-bottom-nav">
+  <a href="dashboard.html">Dashboard</a>
+  <a href="expense.html">Expenses</a>
+  <a href="settings.html" class="active">Settings</a>
+  <a href="library.html">Library</a>
+</nav>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="config.js"></script>
+<script src="auth.js"></script>
+<script src="store.js"></script>
+<script src="tips.js"></script>
+<script>
+  let btUid = null;
+
+  function toast(msg) {
+    const el = document.getElementById("bt-toast");
+    el.textContent = msg; el.classList.add("show");
+    clearTimeout(toast._t); toast._t = setTimeout(() => el.classList.remove("show"), 2600);
+  }
+
+  function updateNetBadge() {
+    const el = document.getElementById("bt-net-badge");
+    if (navigator.onLine) { el.textContent = "Online"; el.className = "bt-badge bt-badge--online"; }
+    else { el.textContent = "Offline"; el.className = "bt-badge bt-badge--offline"; }
+  }
+  window.addEventListener("online", updateNetBadge);
+  window.addEventListener("offline", updateNetBadge);
+
+  function homeCurrency() { return btLoadStore(btUid).profile?.currency || "TTD"; }
+  function fmtHome(n) { return homeCurrency() + " " + Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 }); }
+  function fmtPct(n) { return Math.round(n * 100) + "%"; }
+  function isBusinessNow() { return btIsBusinessAccount(btLoadStore(btUid).profile); }
+
+  /** A plain gold progress bar — Settings has no Bars/Pie/List toggle, it's always this one style. */
+  function progressGraphic(pct, color) {
+    const p = Math.max(0, Math.min(1, pct || 0));
+    return `<div class="bt-progress"><div style="width:${p * 100}%;background:${color || "var(--bt-gold)"}"></div></div>`;
+  }
+  function debtProgressGraphic(pct) {
+    const p = Math.max(0, Math.min(1, pct || 0));
+    const emptyPct = Math.round((1 - p) * 100);
+    return `<div class="bt-progress bt-progress--debt"><div class="bt-progress-debt-fill" style="clip-path: inset(0 ${emptyPct}% 0 0)"></div></div>`;
+  }
+
+  function applyAccountTypeUI(store) {
+    const isBusiness = btIsBusinessAccount(store.profile);
+    document.querySelectorAll(".bt-business-only").forEach((el) => { el.style.display = isBusiness ? "" : "none"; });
+    document.querySelectorAll(".bt-personal-only").forEach((el) => { el.style.display = isBusiness ? "none" : ""; });
+  }
+
+  function renderAccountTypeChips(current) {
+    const wrap = document.getElementById("s-account-type-chips");
+    const options = [{ value: "personal", label: "Personal" }, { value: "business", label: "Business" }];
+    wrap.innerHTML = options.map((o) => `<button type="button" class="bt-chip${o.value === current ? " bt-chip--selected" : ""}" data-value="${o.value}">${o.label}</button>`).join("");
+    wrap.querySelectorAll(".bt-chip").forEach((chip) => {
+      chip.addEventListener("click", () => {
+        wrap.querySelectorAll(".bt-chip").forEach((c) => c.classList.remove("bt-chip--selected"));
+        chip.classList.add("bt-chip--selected");
+        applyAccountTypeUI({ profile: { ...btLoadStore(btUid).profile, account_type: chip.dataset.value } });
+      });
+    });
+  }
+
+  function renderVatRegisteredChips(current) {
+    const wrap = document.getElementById("s-vat-registered-chips");
+    const options = [{ value: "false", label: "Not registered" }, { value: "true", label: "Registered" }];
+    wrap.innerHTML = options.map((o) => `<button type="button" class="bt-chip${o.value === String(current) ? " bt-chip--selected" : ""}" data-value="${o.value}">${o.label}</button>`).join("");
+    wrap.querySelectorAll(".bt-chip").forEach((chip) => {
+      chip.addEventListener("click", () => {
+        wrap.querySelectorAll(".bt-chip").forEach((c) => c.classList.remove("bt-chip--selected"));
+        chip.classList.add("bt-chip--selected");
+      });
+    });
+  }
+
+  function renderFxRatesInputs(store) {
+    const home = store.profile?.currency || "TTD";
+    const extras = (BT_CONFIG.EXTRA_CURRENCIES || []).filter((c) => c !== home);
+    const rates = store.profile?.fx_rates || {};
+    const wrap = document.getElementById("fx-rates-list");
+    if (!extras.length) { wrap.innerHTML = ""; return; }
+    wrap.innerHTML = extras.map((cur) => `
+      <div class="bt-field-row" style="align-items:center;margin-bottom:8px">
+        <div style="flex:none;font-size:0.88rem;width:110px">1 ${cur} =</div>
+        <div><input type="number" min="0" step="0.0001" class="fx-rate-input" data-currency="${cur}" value="${rates[cur] || ""}" placeholder="not set" /></div>
+        <div style="flex:none;font-size:0.88rem">${home}</div>
+      </div>
+    `).join("");
+  }
+
+  const BUDGET_TYPE_BADGE = { need: "🟢 Need", want: "🔵 Want", savings: "💰 Savings", give: "🤲 Giving" };
+
+  function renderBudgetsInputs(store) {
+    const budgets = store.profile?.category_budgets || {};
+    const wrap = document.getElementById("budgets-list");
+    const basis = btAnnualIncomeBasis(store, store.profile?.currency);
+    const monthlyIncome = basis.annualIncome / 12;
+    wrap.innerHTML = (BT_CONFIG.EXPENSE_CATEGORIES || []).map((cat) => {
+      const guide = (BT_CONFIG.CATEGORY_BUDGET_GUIDANCE || {})[cat];
+      const badge = guide ? BUDGET_TYPE_BADGE[guide.type] : "";
+      let hint = "";
+      if (guide && guide.lowPct == null) {
+        hint = "Varies — no typical range for this one.";
+      } else if (guide && monthlyIncome > 0) {
+        const low = monthlyIncome * (guide.lowPct / 100);
+        const high = monthlyIncome * (guide.highPct / 100);
+        hint = `Typically ${fmtHome(low)}–${fmtHome(high)} (${guide.lowPct}–${guide.highPct}% of income) — just a prompt, no limit is set unless you type one.`;
+      } else if (guide) {
+        hint = "Set your annual income above to see a typical range here.";
+      }
+      return `
+      <div style="margin-bottom:14px">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
+          <div style="font-size:0.85rem;display:flex;align-items:center;gap:6px"><strong>${cat}</strong>${badge ? `<span class="bt-role-tag" style="background:var(--bt-cream);color:var(--bt-ink-soft)">${badge}</span>` : ""}</div>
+          <input type="number" min="0" step="0.01" class="budget-input" data-category="${cat}" value="${budgets[cat] || ""}" placeholder="no limit" style="max-width:130px" />
+        </div>
+        ${hint ? `<div style="font-size:0.74rem;color:var(--bt-muted);margin-top:4px">${hint}</div>` : ""}
+      </div>
+    `;
+    }).join("");
+  }
+
+  function refreshGoalCategoryOptions() {
+    const goalCategories = BT_CONFIG.GOAL_CATEGORIES.filter((c) => c !== "Burial Fund" || btBurialFundApplies(btLoadStore(btUid).profile));
+    document.getElementById("g-category").innerHTML = goalCategories.map((c) => `<option value="${c}">${c}</option>`).join("");
+  }
+
+  function renderGoals(store) {
+    const list = btGoalProgress(store);
+    const wrap = document.getElementById("goals-list");
+    if (!list.length) { wrap.innerHTML = '<div class="bt-empty">No goals yet.</div>'; return; }
+    wrap.innerHTML = list.map((g) => `
+      <div class="bt-goal-item">
+        <div class="row1"><strong>${btEscapeHtml(g.description)}</strong><span>${fmtHome(g.saved_amount)} / ${fmtHome(g.target_amount)}</span></div>
+        ${progressGraphic(g.progress_pct)}
+        <div class="meta">${g.category}${g.target_date ? " · by " + g.target_date : ""} · ${fmtPct(g.progress_pct)} complete · <button type="button" class="bt-goal-adjust-btn" data-goal-id="${g.id}">Adjust target</button></div>
+        <div class="bt-goal-adjust-form" id="goal-adjust-${g.id}">
+          <div class="bt-field-row">
+            <div><label>New target amount</label><input type="number" min="0" step="0.01" class="ga-target" value="${g.target_amount}"></div>
+            <div><label>New target date <span style="font-weight:400;color:var(--bt-muted)">(optional)</span></label><input type="date" class="ga-date" value="${g.target_date || ""}"></div>
+          </div>
+          <button type="button" class="bt-btn bt-btn--gold bt-btn--sm ga-save" data-goal-id="${g.id}" style="margin-top:8px">Save</button>
+        </div>
+      </div>
+    `).join("");
+  }
+
+  function renderDebts(store) {
+    const list = btDebtAvalancheOrder(store);
+    const wrap = document.getElementById("debts-list");
+    if (!list.length) { wrap.innerHTML = '<div class="bt-empty">No debts tracked.</div>'; return; }
+    const topPriorityId = list.length > 1 && list[0].interest_rate != null ? list[0].id : null;
+    wrap.innerHTML = list.map((l) => {
+      const pctPaid = l.current_balance > 0 ? Math.min(1, l.paid_via_tracker / l.current_balance) : 0;
+      const dot = l.pace_status ? `<span class="bt-status-dot bt-status-dot--${l.pace_status}" title="Payoff pace"></span>` : "";
+      let paceNote = "";
+      if (l.pace_status) {
+        paceNote = l.overdue
+          ? `Past target payoff date (${l.target_payoff_date})`
+          : l.pace_status === "green"
+            ? `On track for ${l.target_payoff_date}`
+            : `Behind pace for ${l.target_payoff_date}`;
+      }
+      const priorityTag = l.id === topPriorityId ? ' <span class="bt-role-tag" style="background:var(--bt-red-bg);color:var(--bt-red)">🔥 Pay off first</span>' : "";
+      return `
+      <div class="bt-debt-item">
+        <div class="row1"><span style="display:flex;align-items:center;gap:6px">${dot}<strong>${btEscapeHtml(l.debt_name)}</strong>${priorityTag}</span><span>${fmtHome(l.estimated_remaining)} left</span></div>
+        ${debtProgressGraphic(pctPaid)}
+        <div class="meta">${btEscapeHtml(l.lender) || "—"}${l.interest_rate ? " · " + l.interest_rate + "%" : ""} · ${fmtHome(l.paid_via_tracker)} paid via tracker${paceNote ? " · " + paceNote : ""}${l.needs_payment_reminder ? ` · no payment in ${l.days_since_payment}d` : ""}</div>
+      </div>`;
+    }).join("");
+  }
+
+  function renderDisposablePlan(store, summary) {
+    const card = document.getElementById("dip-card");
+    const hasData = store.income.length > 0 && store.expenses.length > 0;
+    if (!hasData) { card.style.display = "none"; return; }
+    card.style.display = "";
+
+    const plan = btDisposableIncomePlan(store, summary, store.profile?.currency);
+    document.getElementById("dip-sub").textContent = plan.items.length
+      ? `You have ${fmtHome(plan.disposable)} in disposable income this month — here's a suggested order to put it to work. Adjust any figure below as you like.`
+      : `You have ${fmtHome(plan.disposable)} in disposable income this month, with nothing urgent left to fund — save it, spend it, or add a new goal.`;
+
+    document.getElementById("dip-list").innerHTML = plan.items.map((item) => `
+      <div class="bt-field-row" style="align-items:center;margin-bottom:8px">
+        <div style="flex:1;font-size:0.85rem">${item.icon} ${btEscapeHtml(item.label)}</div>
+        <div style="flex:none;width:120px"><input type="number" min="0" step="0.01" class="dip-input" value="${item.suggested.toFixed(2)}" /></div>
+      </div>
+    `).join("");
+
+    const updateTotal = () => {
+      let total = 0;
+      document.querySelectorAll(".dip-input").forEach((el) => { total += parseFloat(el.value) || 0; });
+      const totalEl = document.getElementById("dip-total");
+      totalEl.textContent = `${fmtHome(total)} of ${fmtHome(plan.disposable)}`;
+      totalEl.style.color = total > plan.disposable + 0.01 ? "var(--bt-red)" : "var(--bt-green)";
+    };
+    document.querySelectorAll(".dip-input").forEach((el) => el.addEventListener("input", updateTotal));
+    updateTotal();
+  }
+
+  /* ── Achievements — same badge-per-goal/debt/Vacation-Vault logic as the
+     original Dashboard card, just relocated here since it's gamification,
+     not financial status. ── */
+  function fireConfetti() {
+    const canvas = document.createElement("canvas");
+    canvas.style.cssText = "position:fixed;inset:0;pointer-events:none;z-index:9999";
+    canvas.width = window.innerWidth; canvas.height = window.innerHeight;
+    document.body.appendChild(canvas);
+    const ctx = canvas.getContext("2d");
+    const colors = ["#C29133", "#E3B85C", "#3F7A4E", "#221E1F", "#B3413A"];
+    const pieces = Array.from({ length: 90 }, () => ({
+      x: Math.random() * canvas.width, y: -20 - Math.random() * canvas.height * 0.3,
+      vx: (Math.random() - 0.5) * 3, vy: 2 + Math.random() * 3,
+      size: 5 + Math.random() * 5, color: colors[Math.floor(Math.random() * colors.length)],
+      rot: Math.random() * Math.PI, vr: (Math.random() - 0.5) * 0.3
+    }));
+    let frame = 0;
+    (function tick() {
+      frame++;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      pieces.forEach((p) => {
+        p.x += p.vx; p.y += p.vy; p.vy += 0.04; p.rot += p.vr;
+        ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot);
+        ctx.fillStyle = p.color; ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size * 0.6);
+        ctx.restore();
+      });
+      if (frame < 110) requestAnimationFrame(tick); else canvas.remove();
+    })();
+  }
+
+  function playChime() {
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      const ctx = new AC();
+      [660, 880, 1100].forEach((freq, i) => {
+        const osc = ctx.createOscillator(); const gain = ctx.createGain();
+        osc.type = "sine"; osc.frequency.value = freq;
+        osc.connect(gain); gain.connect(ctx.destination);
+        const start = ctx.currentTime + i * 0.09;
+        gain.gain.setValueAtTime(0, start);
+        gain.gain.linearRampToValueAtTime(0.18, start + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.001, start + 0.35);
+        osc.start(start); osc.stop(start + 0.4);
+      });
+    } catch (e) { /* Web Audio unavailable — badge still glows silently */ }
+  }
+
+  const GOAL_BADGE_ICONS = {
+    "Debt Reduction": "💸", "Investing": "📈", "Education": "🎓", "Emergency Fund": "🛟",
+    "Critical Illness Fund": "🏥", "Burial Fund": "⚱️", "Hajj / Umrah Fund": "🕋",
+    "House Down Payment": "🏠", "Investment Property Down Payment": "🏢", "Car Down Payment": "🚗",
+    "Car Insurance": "🚙", "Property Insurance": "🛡️", "Taxes": "🧾", "Personal": "🙂", "Other": "🎯"
+  };
+
+  function computeBadges(store) {
+    const badges = [];
+    btGoalProgress(store).filter((g) => g.category !== "Vacation Vault").forEach((g) => {
+      badges.push({
+        id: "goal-" + g.id, type: "goal", icon: GOAL_BADGE_ICONS[g.category] || "🎯", name: g.description, pct: g.progress_pct, earned: g.progress_pct >= 1,
+        status: g.progress_pct >= 1 ? ("Completed" + (g.target_date ? " · target " + g.target_date : "")) : fmtPct(g.progress_pct) + " there"
+      });
+    });
+    btLiabilityProgress(store).forEach((l) => {
+      const pct = l.current_balance > 0 ? Math.min(1, l.paid_via_tracker / l.current_balance) : 0;
+      const earned = l.estimated_remaining <= 0;
+      badges.push({
+        id: "debt-" + l.id, type: "debt", name: l.debt_name, pct, earned,
+        status: earned ? ("Settled" + (l.target_payoff_date ? " · target " + l.target_payoff_date : "")) : fmtPct(pct) + " paid off"
+      });
+    });
+    const vaultGoals = btGoalProgress(store).filter((g) => g.category === "Vacation Vault");
+    const vaultSaved = vaultGoals.reduce((s, g) => s + g.saved_amount, 0);
+    const vaultTarget = vaultGoals.reduce((s, g) => s + g.target_amount, 0);
+    const vaultEarned = vaultTarget > 0 && vaultSaved >= vaultTarget;
+    badges.push({
+      id: "vacation-vault", type: "vault", icon: "🌴", name: "Vacation Vault",
+      pct: vaultTarget > 0 ? Math.min(1, vaultSaved / vaultTarget) : 0,
+      earned: vaultEarned, locked: false,
+      status: vaultTarget > 0 ? (vaultEarned ? "Funded!" : fmtPct(vaultSaved / vaultTarget) + " there") : "Active — add a Vacation Vault goal to start tracking"
+    });
+    return badges;
+  }
+
+  function renderBadges(store) {
+    const badges = computeBadges(store);
+    const wrap = document.getElementById("badges-grid");
+    if (!badges.length) { wrap.innerHTML = '<div class="bt-empty">Add a goal or debt to start earning badges.</div>'; return; }
+
+    wrap.innerHTML = badges.map((b) => {
+      if (b.type === "debt") {
+        const emptyPct = Math.round((1 - b.pct) * 100);
+        return `
+        <div class="bt-badge-card ${b.earned ? "earned" : ""}">
+          <div class="bt-debt-power-wrap"><div class="bt-debt-power" title="${Math.round(b.pct * 100)}% paid off"><div class="fill" style="clip-path: inset(0 ${emptyPct}% 0 0)"></div></div></div>
+          <div class="name">${btEscapeHtml(b.name)}</div>
+          <div class="status">${btEscapeHtml(b.status)}</div>
+        </div>`;
+      }
+      const deg = Math.round(b.pct * 360);
+      return `
+      <div class="bt-badge-card ${b.earned ? "earned" : ""}${b.locked ? " locked" : ""}">
+        <div class="bt-badge-ring" style="background:conic-gradient(var(--bt-gold) ${deg}deg, var(--bt-border) ${deg}deg)"><span class="icon-inner">${b.locked ? "🔒" : b.icon}</span></div>
+        <div class="name">${btEscapeHtml(b.name)}</div>
+        <div class="status">${btEscapeHtml(b.status)}</div>
+      </div>`;
+    }).join("");
+
+    const seenKey = "bt_badges_seen_" + btUid;
+    let seen = null;
+    try { seen = JSON.parse(localStorage.getItem(seenKey)); } catch (e) {}
+    const earnedIds = badges.filter((b) => b.earned).map((b) => b.id);
+    if (seen) {
+      const newlyEarned = badges.filter((b) => b.earned && !seen.includes(b.id));
+      if (newlyEarned.length) {
+        fireConfetti(); playChime();
+        toast(newlyEarned.length === 1 ? `🏆 Badge earned: ${newlyEarned[0].name}!` : `🏆 ${newlyEarned.length} badges earned!`);
+      }
+    }
+    try { localStorage.setItem(seenKey, JSON.stringify(earnedIds)); } catch (e) {}
+  }
+
+  /* ── Log Income block — same field set and save logic as income.html's
+     own form (minus the bank-screenshot attach, kept simpler here since
+     income.html still exists for that). ── */
+  function populateIncomeProjectOptions() {
+    const sel = document.getElementById("inc-project");
+    const store = btLoadStore(btUid);
+    const current = sel.value;
+    const currentLabel = sel.options[sel.selectedIndex]?.textContent;
+    const active = store.projects.filter((p) => p.status === "active");
+    sel.innerHTML = '<option value="">— none —</option>' +
+      active.map((p) => `<option value="${p.id}">${btEscapeHtml(p.name)}</option>`).join("") +
+      '<option value="__new__">+ New project…</option>';
+    if (active.some((p) => p.id === current)) sel.value = current;
+    else if (current && current !== "__new__") {
+      const match = active.find((p) => p.name === currentLabel);
+      if (match) sel.value = match.id;
+    }
+  }
+
+  function renderIncomeCategoryChips() {
+    const wrap = document.getElementById("inc-category-chips");
+    const current = wrap.querySelector(".bt-chip--selected")?.dataset.value;
+    wrap.innerHTML = BT_CONFIG.BUSINESS_INCOME_CATEGORIES.map((c) =>
+      `<button type="button" class="bt-chip${c === current ? " bt-chip--selected" : ""}" data-value="${btEscapeHtml(c)}">${btEscapeHtml(c)}</button>`
+    ).join("");
+    wrap.querySelectorAll(".bt-chip").forEach((chip) => {
+      chip.addEventListener("click", () => {
+        wrap.querySelectorAll(".bt-chip").forEach((c) => c.classList.remove("bt-chip--selected"));
+        chip.classList.add("bt-chip--selected");
+      });
+    });
+  }
+
+  function renderIncomeVatChips() {
+    const wrap = document.getElementById("inc-vat-chips");
+    const current = wrap.querySelector(".bt-chip--selected")?.dataset.value || "standard_rated";
+    wrap.innerHTML = BT_CONFIG.VAT_TREATMENTS.map((t) =>
+      `<button type="button" class="bt-chip${t.value === current ? " bt-chip--selected" : ""}" data-value="${t.value}">${t.label}</button>`
+    ).join("");
+    wrap.querySelectorAll(".bt-chip").forEach((chip) => {
+      chip.addEventListener("click", () => {
+        wrap.querySelectorAll(".bt-chip").forEach((c) => c.classList.remove("bt-chip--selected"));
+        chip.classList.add("bt-chip--selected");
+        suggestIncomeVatAmount();
+      });
+    });
+  }
+
+  function suggestIncomeVatAmount() {
+    const treatment = document.querySelector("#inc-vat-chips .bt-chip--selected")?.dataset.value;
+    const vatInput = document.getElementById("inc-vat-amount");
+    if (treatment !== "standard_rated") { vatInput.value = ""; vatInput.dataset.suggested = ""; return; }
+    if (vatInput.value && vatInput.value !== vatInput.dataset.suggested) return;
+    const amount = parseFloat(document.getElementById("inc-amount").value) || 0;
+    const rate = Number(btLoadStore(btUid).profile?.vat_rate ?? BT_CONFIG.DEFAULT_VAT_RATE);
+    const suggested = amount > 0 ? (amount * rate / (100 + rate)).toFixed(2) : "";
+    vatInput.value = suggested;
+    vatInput.dataset.suggested = suggested;
+  }
+
+  function applyIncomeAccountTypeUI() {
+    const isBiz = isBusinessNow();
+    document.getElementById("inc-biz-fields").style.display = isBiz ? "" : "none";
+    if (isBiz) { renderIncomeCategoryChips(); renderIncomeVatChips(); populateIncomeProjectOptions(); }
+  }
+
+  function paymentAccountSuggestions(store) {
+    const names = new Set();
+    [...store.income, ...store.expenses].forEach((e) => { if (e.payment_account) names.add(e.payment_account); });
+    return [...names];
+  }
+
+  function refreshIncomePaymentAccountSuggestions() {
+    const store = btLoadStore(btUid);
+    document.getElementById("inc-payment-account-suggestions").innerHTML =
+      paymentAccountSuggestions(store).map((n) => `<option value="${n}">`).join("");
+  }
+
+  function setupIncomeForm() {
+    document.getElementById("inc-date").value = new Date().toISOString().slice(0, 10);
+    document.getElementById("inc-frequency").innerHTML = BT_CONFIG.INCOME_FREQUENCIES.map((f) => `<option value="${f}">${f}</option>`).join("");
+    document.getElementById("inc-source-suggestions").innerHTML = BT_CONFIG.INCOME_SOURCE_SUGGESTIONS.map((s) => `<option value="${s}">`).join("");
+    const currencySel = document.getElementById("inc-currency");
+    currencySel.innerHTML = btCurrencyOptions(btLoadStore(btUid).profile).map((c) => `<option value="${c}">${c}</option>`).join("");
+    const paymentSel = document.getElementById("inc-payment-type");
+    paymentSel.innerHTML = '<option value="">— not specified —</option>' + BT_CONFIG.PAYMENT_TYPES.map((p) => `<option value="${p}">${p}</option>`).join("");
+    const lastPaymentType = localStorage.getItem("bt_last_income_payment_type");
+    if (lastPaymentType && BT_CONFIG.PAYMENT_TYPES.includes(lastPaymentType)) paymentSel.value = lastPaymentType;
+    refreshIncomePaymentAccountSuggestions();
+    applyIncomeAccountTypeUI();
+
+    document.getElementById("inc-amount").addEventListener("input", suggestIncomeVatAmount);
+    document.getElementById("inc-project").addEventListener("change", async (e) => {
+      if (e.target.value !== "__new__") return;
+      const name = prompt("Project / contract name:");
+      if (!name || !name.trim()) { e.target.value = ""; return; }
+      const tempId = btAddProject(btUid, { name: name.trim(), status: "active" });
+      populateIncomeProjectOptions();
+      e.target.value = tempId;
+      if (navigator.onLine) { await btSync(btUid); populateIncomeProjectOptions(); }
+    });
+
+    document.getElementById("inc-submit").addEventListener("click", () => {
+      const source = document.getElementById("inc-source").value.trim();
+      const amount = parseFloat(document.getElementById("inc-amount").value);
+      const currency = currencySel.value;
+      const frequency = document.getElementById("inc-frequency").value;
+      const entry_date = document.getElementById("inc-date").value;
+      const notes = document.getElementById("inc-notes").value.trim() || null;
+      const payment_type = paymentSel.value || null;
+      const payment_account = document.getElementById("inc-payment-account").value.trim() || null;
+      const isBiz = isBusinessNow();
+      const category = document.querySelector("#inc-category-chips .bt-chip--selected")?.dataset.value || null;
+
+      if (!source) return toast("Enter an income source.");
+      if (!amount || amount <= 0) return toast("Enter a valid amount.");
+      if (!entry_date) return toast("Pick a date.");
+      if (isBiz && !category) return toast("Pick a revenue category.");
+
+      const payload = { source, amount, currency, frequency, entry_date, notes, payment_type, payment_account };
+      if (isBiz) {
+        payload.category = category;
+        const vatTreatment = document.querySelector("#inc-vat-chips .bt-chip--selected")?.dataset.value || null;
+        const vatAmountVal = parseFloat(document.getElementById("inc-vat-amount").value);
+        payload.vat_treatment = vatTreatment;
+        payload.vat_amount = vatTreatment === "standard_rated" && vatAmountVal >= 0 ? vatAmountVal : null;
+        payload.project_id = document.getElementById("inc-project").value || null;
+      }
+      btAddIncome(btUid, payload);
+      refreshIncomePaymentAccountSuggestions();
+      toast(navigator.onLine ? "Income saved" : "Saved offline — will sync automatically");
+      if (payment_type) localStorage.setItem("bt_last_income_payment_type", payment_type);
+
+      document.getElementById("inc-source").value = "";
+      document.getElementById("inc-amount").value = "";
+      document.getElementById("inc-notes").value = "";
+      document.getElementById("inc-payment-account").value = "";
+      if (isBiz) {
+        document.getElementById("inc-vat-amount").value = "";
+        document.getElementById("inc-vat-amount").dataset.suggested = "";
+        document.getElementById("inc-project").value = "";
+        document.querySelectorAll("#inc-category-chips .bt-chip").forEach((c) => c.classList.remove("bt-chip--selected"));
+      }
+    });
+  }
+
+  function renderAll() {
+    const store = btLoadStore(btUid);
+    document.getElementById("s-name").value = store.profile?.full_name || "";
+    document.getElementById("s-currency").value = store.profile?.currency || "TTD";
+    document.getElementById("s-annual-income").value = store.profile?.annual_income || "";
+    document.getElementById("s-dependents").value = store.profile?.dependents_count || 0;
+    document.getElementById("s-dob").value = store.profile?.date_of_birth || "";
+    document.getElementById("s-business-name").value = store.profile?.business_name || "";
+    document.getElementById("s-vat-rate").value = store.profile?.vat_rate ?? BT_CONFIG.DEFAULT_VAT_RATE;
+    document.getElementById("s-vat-number").value = store.profile?.vat_number || "";
+    renderAccountTypeChips(store.profile?.account_type || "personal");
+    renderVatRegisteredChips(!!store.profile?.vat_registered);
+    document.getElementById("pw-status-text").textContent = store.profile?.has_password
+      ? "A password is set — you can sign in directly any time, no email wait."
+      : "No password set yet — you currently need a fresh emailed link each time you sign in.";
+    document.getElementById("pw-toggle").textContent = store.profile?.has_password ? "Change password" : "Set a password";
+    renderFxRatesInputs(store);
+    renderBudgetsInputs(store);
+
+    const summary = btDashboardSummary(store, store.profile?.currency);
+    renderDisposablePlan(store, summary);
+    renderGoals(store);
+    renderDebts(store);
+    renderBadges(store);
+    applyIncomeAccountTypeUI();
+
+    applyAccountTypeUI(store);
+  }
+
+  async function init() {
+    const user = await btRequireAuth();
+    if (!user) return;
+    btUid = window.btCurrentUserId = user.id;
+
+    updateNetBadge();
+    renderAll();
+    btSync(btUid).then(renderAll);
+
+    document.getElementById("bt-logout").addEventListener("click", async () => { await btSignOut(); window.location.replace("login.html"); });
+
+    refreshGoalCategoryOptions();
+    setupIncomeForm();
+
+    document.getElementById("toggle-goal-form").addEventListener("click", () => document.getElementById("goal-form").classList.toggle("show"));
+    document.getElementById("toggle-debt-form").addEventListener("click", () => document.getElementById("debt-form").classList.toggle("show"));
+
+    document.getElementById("goals-list").addEventListener("click", (e) => {
+      const adjustBtn = e.target.closest(".bt-goal-adjust-btn");
+      if (adjustBtn) {
+        document.getElementById("goal-adjust-" + adjustBtn.dataset.goalId).classList.toggle("show");
+        return;
+      }
+      const saveBtn = e.target.closest(".ga-save");
+      if (saveBtn) {
+        const id = saveBtn.dataset.goalId;
+        const form = document.getElementById("goal-adjust-" + id);
+        const target_amount = parseFloat(form.querySelector(".ga-target").value);
+        const target_date = form.querySelector(".ga-date").value || null;
+        if (!target_amount || target_amount <= 0) return toast("Enter a valid target amount.");
+        btUpdateGoal(btUid, id, { target_amount, target_date });
+        toast("Target updated");
+        renderAll();
+      }
+    });
+
+    async function submitPasswordForm(pwId, confirmId, statusId, saveBtnId, savingLabel, idleLabel, onSuccess) {
+      const statusEl = document.getElementById(statusId);
+      const pw = document.getElementById(pwId).value;
+      const confirm = document.getElementById(confirmId).value;
+      statusEl.textContent = ""; statusEl.className = "";
+      if (pw.length < 8) { statusEl.textContent = "Password must be at least 8 characters."; statusEl.className = "err"; return; }
+      if (pw !== confirm) { statusEl.textContent = "Passwords don't match."; statusEl.className = "err"; return; }
+      if (!navigator.onLine) { statusEl.textContent = "You need a connection to set a password."; statusEl.className = "err"; return; }
+      const saveBtn = document.getElementById(saveBtnId);
+      saveBtn.disabled = true; saveBtn.textContent = savingLabel;
+      try {
+        await btSetPassword(pw);
+        btUpdateProfile(btUid, { has_password: true });
+        document.getElementById(pwId).value = "";
+        document.getElementById(confirmId).value = "";
+        onSuccess();
+      } catch (err) {
+        statusEl.textContent = err.message || "Couldn't set password — try again.";
+        statusEl.className = "err";
+      }
+      saveBtn.disabled = false; saveBtn.textContent = idleLabel;
+    }
+
+    document.getElementById("pw-toggle").addEventListener("click", () => {
+      document.getElementById("pw-form").style.display = document.getElementById("pw-form").style.display === "none" ? "" : "none";
+    });
+    document.getElementById("pw-save").addEventListener("click", () => {
+      const wasFirstTime = !btLoadStore(btUid).profile?.has_password;
+      submitPasswordForm("pw-password", "pw-confirm", "pw-status", "pw-save", "Saving…", wasFirstTime ? "Set password" : "Save password", () => {
+        document.getElementById("pw-form").style.display = "none";
+        document.getElementById("pw-status-text").textContent = "A password is set — you can sign in directly any time, no email wait.";
+        document.getElementById("pw-toggle").textContent = "Change password";
+        toast(wasFirstTime ? "Password set — you can now sign in directly, any time." : "Password updated.");
+      });
+    });
+
+    document.getElementById("g-submit").addEventListener("click", () => {
+      const description = document.getElementById("g-desc").value.trim();
+      const target_amount = parseFloat(document.getElementById("g-target").value);
+      const opening_amount = parseFloat(document.getElementById("g-opening").value) || 0;
+      const category = document.getElementById("g-category").value;
+      const target_date = document.getElementById("g-date").value || null;
+      if (!description) return toast("Enter a goal description.");
+      if (!target_amount || target_amount <= 0) return toast("Enter a target amount.");
+      btAddGoal(btUid, { description, category, target_amount, opening_amount, target_date });
+      document.getElementById("g-desc").value = ""; document.getElementById("g-target").value = ""; document.getElementById("g-opening").value = "0"; document.getElementById("g-date").value = "";
+      document.getElementById("goal-form").classList.remove("show");
+      renderAll();
+      toast("Goal saved");
+    });
+
+    document.getElementById("d-submit").addEventListener("click", () => {
+      const debt_name = document.getElementById("d-name").value.trim();
+      const lender = document.getElementById("d-lender").value.trim() || null;
+      const current_balance = parseFloat(document.getElementById("d-balance").value);
+      const interest_rate = parseFloat(document.getElementById("d-rate").value) || null;
+      const min_payment = parseFloat(document.getElementById("d-min").value) || null;
+      const target_payoff_date = document.getElementById("d-date").value || null;
+      if (!debt_name) return toast("Enter a debt name.");
+      if (current_balance === undefined || isNaN(current_balance) || current_balance < 0) return toast("Enter the current balance owed.");
+      btAddLiability(btUid, { debt_name, lender, current_balance, interest_rate, min_payment, target_payoff_date, created_at: new Date().toISOString() });
+      document.getElementById("d-name").value = ""; document.getElementById("d-lender").value = ""; document.getElementById("d-balance").value = ""; document.getElementById("d-rate").value = ""; document.getElementById("d-min").value = ""; document.getElementById("d-date").value = "";
+      document.getElementById("debt-form").classList.remove("show");
+      renderAll();
+      toast("Debt saved");
+    });
+
+    const showTipsBox = document.getElementById("s-show-tips");
+    showTipsBox.checked = !btTipsHidden();
+    showTipsBox.addEventListener("change", () => btSetTipsHidden(!showTipsBox.checked));
+
+    document.getElementById("s-save").addEventListener("click", () => {
+      const full_name = document.getElementById("s-name").value.trim() || null;
+      const curr = document.getElementById("s-currency").value.trim() || "TTD";
+      const annualIncomeVal = parseFloat(document.getElementById("s-annual-income").value);
+      const annual_income = annualIncomeVal > 0 ? annualIncomeVal : null;
+      const dependents_count = Math.max(0, parseInt(document.getElementById("s-dependents").value, 10) || 0);
+      const date_of_birth = document.getElementById("s-dob").value || null;
+      const fx_rates = {};
+      document.querySelectorAll(".fx-rate-input").forEach((el) => {
+        const v = parseFloat(el.value);
+        if (v > 0) fx_rates[el.dataset.currency] = v;
+      });
+      const category_budgets = {};
+      document.querySelectorAll(".budget-input").forEach((el) => {
+        const v = parseFloat(el.value);
+        if (v > 0) category_budgets[el.dataset.category] = v;
+      });
+      const account_type = document.querySelector("#s-account-type-chips .bt-chip--selected")?.dataset.value || "personal";
+      const business_name = document.getElementById("s-business-name").value.trim() || null;
+      const vat_registered = document.querySelector("#s-vat-registered-chips .bt-chip--selected")?.dataset.value === "true";
+      const vat_number = document.getElementById("s-vat-number").value.trim() || null;
+      const vatRateVal = parseFloat(document.getElementById("s-vat-rate").value);
+      const vat_rate = vatRateVal >= 0 ? vatRateVal : BT_CONFIG.DEFAULT_VAT_RATE;
+      btUpdateProfile(btUid, {
+        full_name, currency: curr, annual_income, dependents_count, date_of_birth, fx_rates, category_budgets,
+        account_type, business_name, vat_registered, vat_number, vat_rate
+      });
+      refreshGoalCategoryOptions();
+      renderAll();
+      toast("Settings saved");
+    });
+
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("sw.js").catch(() => {});
+      navigator.serviceWorker.addEventListener("controllerchange", () => {
+        let last = 0;
+        try { last = parseInt(sessionStorage.getItem("bt_sw_reload_ts") || "0", 10); } catch (e) {}
+        if (Date.now() - last < 5000) return;
+        try { sessionStorage.setItem("bt_sw_reload_ts", String(Date.now())); } catch (e) {}
+        window.location.reload();
+      });
+    }
+  }
+  init();
+</script>
+</body>
+</html>

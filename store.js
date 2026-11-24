@@ -1143,3 +1143,85 @@ function btVacationVaultSuggestion(disposable, pct) {
   const p = Math.max(0, Math.min(100, Number(pct) || 0));
   return { pct: p, monthlyContribution: Math.max(0, disposable) * (p / 100) };
 }
+
+/** Advances a date forward by one period of the given income frequency. Returns null for a frequency with no regular period (e.g. "One-time"). */
+function btAdvanceByFrequency(date, frequency) {
+  const d = new Date(date.getTime());
+  switch (frequency) {
+    case "Weekly": d.setDate(d.getDate() + 7); return d;
+    case "Bi-Weekly": d.setDate(d.getDate() + 14); return d;
+    case "Monthly": d.setMonth(d.getMonth() + 1); return d;
+    case "Annually": d.setFullYear(d.getFullYear() + 1); return d;
+    default: return null;
+  }
+}
+
+/**
+ * A chronological look-ahead of what's coming, within `days` of today —
+ * goal deadlines, this/next month's still-unpaid recurring bills, and an
+ * estimated next payday per income source (each source's most recent
+ * entry date, advanced forward by its usual frequency until it's back in
+ * the future). Pure and read-only: the Dashboard renders this list as
+ * plain text, nothing here is editable from it. Skips anything with a
+ * malformed or missing date rather than letting it throw.
+ */
+function btUpcomingTimeline(store, days = 60) {
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const horizon = new Date(today.getTime() + days * 86400000);
+  const items = [];
+
+  btGoalProgress(store).forEach((g) => {
+    if (!g.target_date || g.progress_pct >= 1) return;
+    const d = new Date(g.target_date + "T00:00:00");
+    if (isNaN(d.getTime())) return;
+    const daysUntil = Math.round((d - today) / 86400000);
+    if (d > horizon) return;
+    items.push({
+      date: g.target_date, icon: "🎯",
+      label: daysUntil < 0
+        ? `${g.description} target date was ${Math.abs(daysUntil)}d ago`
+        : daysUntil === 0
+          ? `${g.description} target date is today`
+          : `${g.description} target date in ${daysUntil}d`
+    });
+  });
+
+  btBillsStatus(store, today).forEach((b) => {
+    if (b.paidThisMonth) return;
+    const day = Math.max(1, Math.min(28, Number(b.day_of_month) || 1));
+    let due = new Date(today.getFullYear(), today.getMonth(), day);
+    if (due < today) due = new Date(today.getFullYear(), today.getMonth() + 1, day);
+    if (due > horizon) return;
+    const daysUntil = Math.round((due - today) / 86400000);
+    items.push({
+      date: due.toISOString().slice(0, 10), icon: "🧾",
+      label: `${b.name} due${daysUntil === 0 ? " today" : daysUntil < 0 ? ` ${Math.abs(daysUntil)}d overdue` : ` in ${daysUntil}d`} — ${Number(b.amount).toLocaleString(undefined, { maximumFractionDigits: 0 })}`
+    });
+  });
+
+  const bySource = {};
+  store.income.forEach((e) => {
+    if (!e.source || !e.entry_date || e.frequency === "One-time") return;
+    const existing = bySource[e.source];
+    if (!existing || e.entry_date > existing.entry_date) bySource[e.source] = e;
+  });
+  Object.values(bySource).forEach((e) => {
+    let next = new Date(e.entry_date + "T00:00:00");
+    if (isNaN(next.getTime())) return;
+    let guard = 0;
+    while (next <= today && guard < 36) {
+      const advanced = btAdvanceByFrequency(next, e.frequency);
+      if (!advanced) return;
+      next = advanced;
+      guard++;
+    }
+    if (next > horizon) return;
+    const daysUntil = Math.round((next - today) / 86400000);
+    items.push({
+      date: next.toISOString().slice(0, 10), icon: "💰",
+      label: `${e.source} expected${daysUntil === 0 ? " today" : ` in ${daysUntil}d`} — ~${Number(e.amount).toLocaleString(undefined, { maximumFractionDigits: 0 })}`
+    });
+  });
+
+  return items.sort((a, b) => a.date.localeCompare(b.date)).slice(0, 10);
+}
