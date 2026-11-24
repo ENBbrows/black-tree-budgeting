@@ -22,7 +22,7 @@
   .bt-topbar-right { display:flex; align-items:center; gap:10px; }
   .bt-agent-banner { background: var(--bt-ink); color: var(--bt-white); text-align:center; padding: 10px; font-size: 0.85rem; }
   .bt-agent-banner a { color: var(--bt-gold-light); }
-  #setpw-status.err { color: var(--bt-red); }
+  #pw-status.err { color: var(--bt-red); }
   .bt-role-tag { font-size:0.68rem; text-transform:uppercase; letter-spacing:0.03em; padding:3px 8px; border-radius:999px; font-weight:700; }
   .bf-toggle-head { cursor: pointer; user-select: none; display:flex; align-items:center; justify-content:space-between; }
   .bf-chevron { font-weight: 400; color: var(--bt-muted); transition: transform .2s; }
@@ -178,20 +178,6 @@
   </div>
 
   <div id="bt-onboard" style="display:none"></div>
-
-  <div class="bt-card bt-invest-card" id="setpw-card" style="display:none">
-    <h2>🔑 Set a password for faster sign-in</h2>
-    <p class="bt-sub" style="margin-bottom:12px">Right now you can only sign in with a fresh one-time link each time. Set a password once and you can sign in directly, as many times as you like, with no email wait.</p>
-    <div class="bt-field-row">
-      <div><label for="setpw-password">New password</label><input id="setpw-password" type="password" autocomplete="new-password" placeholder="At least 8 characters" /></div>
-      <div><label for="setpw-confirm">Confirm password</label><input id="setpw-confirm" type="password" autocomplete="new-password" placeholder="Re-enter password" /></div>
-    </div>
-    <div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap">
-      <button class="bt-btn bt-btn--gold" id="setpw-save">Set password</button>
-      <button class="bt-btn bt-btn--ghost" id="setpw-dismiss">Maybe later</button>
-    </div>
-    <div id="setpw-status" style="font-size:0.86rem;margin-top:10px;min-height:1.2em"></div>
-  </div>
 
   <div class="bt-quick-actions">
     <a href="income.html" class="bt-btn bt-btn--gold">+ Log Income</a>
@@ -1123,8 +1109,6 @@
     // personal-only conditional cards above just decided to show.
     applyAccountTypeUI(store);
 
-    renderSetupPasswordCard(store);
-
     if (!readOnly) {
       document.getElementById("s-name").value = store.profile?.full_name || "";
       document.getElementById("s-currency").value = store.profile?.currency || "TTD";
@@ -1139,6 +1123,7 @@
       document.getElementById("pw-status-text").textContent = store.profile?.has_password
         ? "A password is set — you can sign in directly any time, no email wait."
         : "No password set yet — you currently need a fresh emailed link each time you sign in.";
+      document.getElementById("pw-toggle").textContent = store.profile?.has_password ? "Change password" : "Set a password";
       renderFxRatesInputs(store);
       renderBudgetsInputs(store);
     }
@@ -1177,13 +1162,6 @@
         chip.classList.add("bt-chip--selected");
       });
     });
-  }
-
-  function renderSetupPasswordCard(store) {
-    const card = document.getElementById("setpw-card");
-    const hasPassword = !!store.profile?.has_password;
-    const dismissed = sessionStorage.getItem("bt-setpw-dismissed") === "1";
-    card.style.display = (!readOnly && !hasPassword && !dismissed) ? "" : "none";
   }
 
   function setReadOnly() {
@@ -1291,12 +1269,7 @@
         window.location.href = "expense.html";
       });
 
-      document.getElementById("setpw-dismiss").addEventListener("click", () => {
-        sessionStorage.setItem("bt-setpw-dismissed", "1");
-        document.getElementById("setpw-card").style.display = "none";
-      });
-
-      /** Shared by the one-time setup CTA and Settings' permanent "Change password" control — same validation, same btSetPassword() call either way. */
+      /** Used by Settings' one permanent password control — covers both setting a password for the first time and changing it later. */
       async function submitPasswordForm(pwId, confirmId, statusId, saveBtnId, savingLabel, idleLabel, onSuccess) {
         const statusEl = document.getElementById(statusId);
         const pw = document.getElementById(pwId).value;
@@ -1320,23 +1293,16 @@
         saveBtn.disabled = false; saveBtn.textContent = idleLabel;
       }
 
-      document.getElementById("setpw-save").addEventListener("click", () => {
-        submitPasswordForm("setpw-password", "setpw-confirm", "setpw-status", "setpw-save", "Saving…", "Set password", () => {
-          document.getElementById("setpw-card").style.display = "none";
-          document.getElementById("pw-status-text").textContent = "A password is set — you can sign in directly any time, no email wait.";
-          toast("Password set — you can now sign in directly, any time.");
-        });
-      });
-
       document.getElementById("pw-toggle").addEventListener("click", () => {
         document.getElementById("pw-form").style.display = document.getElementById("pw-form").style.display === "none" ? "" : "none";
       });
       document.getElementById("pw-save").addEventListener("click", () => {
-        submitPasswordForm("pw-password", "pw-confirm", "pw-status", "pw-save", "Saving…", "Save password", () => {
+        const wasFirstTime = !btLoadStore(btUid).profile?.has_password;
+        submitPasswordForm("pw-password", "pw-confirm", "pw-status", "pw-save", "Saving…", wasFirstTime ? "Set password" : "Save password", () => {
           document.getElementById("pw-form").style.display = "none";
           document.getElementById("pw-status-text").textContent = "A password is set — you can sign in directly any time, no email wait.";
-          document.getElementById("setpw-card").style.display = "none";
-          toast("Password updated.");
+          document.getElementById("pw-toggle").textContent = "Change password";
+          toast(wasFirstTime ? "Password set — you can now sign in directly, any time." : "Password updated.");
         });
       });
 
