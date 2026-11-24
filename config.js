@@ -43,6 +43,51 @@ const BT_CONFIG = {
   GOAL_LINK_CATEGORY: "Savings & Investments",
   DEBT_LINK_CATEGORY: "Debt Repayment",
 
+  /* ── Business accounts ──────────────────────────────────────────
+     A second account type (Settings → Account Type) for a client
+     running a small business — built with a contracting business in
+     mind, general enough for other trades/small businesses too. Kept
+     entirely separate from the personal categories/goals above: a
+     business account's Income/Expense Trackers use these lists
+     instead, and none of the personal-only sections (Protection
+     Planner, Vacation Vault, down-payment goals, etc.) apply. */
+  BUSINESS_INCOME_CATEGORIES: ["Contract Revenue", "Service Income", "Product Sales", "Other Income"],
+  BUSINESS_EXPENSE_CATEGORIES: [
+    "Materials & Supplies", "Subcontractor Payments", "Labour & Wages",
+    "Equipment & Tools", "Equipment Rental", "Vehicle & Transport",
+    "Permits & Licenses", "Insurance", "Rent & Utilities",
+    "Professional Fees", "Marketing & Advertising", "Bank Charges & Interest",
+    "Office Supplies", "Other"
+  ],
+  BUSINESS_CATEGORY_KEYWORDS: {
+    "Materials & Supplies": ["materials", "supplies", "hardware", "lumber", "cement", "steel", "paint"],
+    "Subcontractor Payments": ["subcontractor", "sub-contractor", "contractor payment"],
+    "Labour & Wages": ["wages", "payroll", "salary", "worker pay"],
+    "Equipment & Tools": ["tools", "equipment purchase", "machinery"],
+    "Equipment Rental": ["rental", "equipment hire", "scaffolding"],
+    "Vehicle & Transport": ["fuel", "gas", "petrol", "vehicle", "truck", "maintenance"],
+    "Permits & Licenses": ["permit", "license", "licence", "approval fee"],
+    "Insurance": ["insurance", "premium", "liability cover"],
+    "Rent & Utilities": ["rent", "electricity", "water", "internet", "office rent", "yard rent"],
+    "Professional Fees": ["accountant", "accounting", "legal", "lawyer", "consultant fee"],
+    "Marketing & Advertising": ["advertising", "marketing", "signage", "flyers", "website"],
+    "Bank Charges & Interest": ["bank charge", "bank fee", "interest", "loan interest"],
+    "Office Supplies": ["stationery", "office supplies", "printer", "paper"]
+  },
+  /* T&T VAT treatment options for a business transaction's VAT field.
+     The account's vat_rate (Settings) is the default % for a
+     standard-rated line; the client's own figure wins if they adjust
+     it — this app tracks bookkeeping numbers, not an authoritative
+     filing: confirm actual VAT/Corporation Tax/Business Levy treatment
+     with a licensed accountant before filing. */
+  VAT_TREATMENTS: [
+    { value: "standard_rated", label: "Standard-rated" },
+    { value: "zero_rated", label: "Zero-rated" },
+    { value: "exempt", label: "Exempt" },
+    { value: "out_of_scope", label: "Out of scope" }
+  ],
+  DEFAULT_VAT_RATE: 12.5,
+
   GOAL_CATEGORIES: ["Debt Reduction", "Investing", "Education", "Emergency Fund", "Critical Illness Fund", "Burial Fund", "Vacation Vault", "Hajj / Umrah Fund", "House Down Payment", "Investment Property Down Payment", "Car Down Payment", "Car Insurance", "Property Insurance", "Taxes", "Personal", "Other"],
 
   /* Categories treated as "cost of living" — the baseline that has to keep

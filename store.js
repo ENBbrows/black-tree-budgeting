@@ -14,7 +14,7 @@ const btStoreKey = (uid) => `bt_store_${uid}`;
 const btQueueKey = (uid) => `bt_queue_${uid}`;
 
 function btEmptyStore() {
-  return { profile: null, goals: [], liabilities: [], bills: [], income: [], expenses: [], syncedAt: null };
+  return { profile: null, goals: [], liabilities: [], bills: [], income: [], expenses: [], projects: [], syncedAt: null };
 }
 
 function btLoadStore(uid) {
@@ -44,7 +44,8 @@ const BT_TABLE_TO_STORE_KEY = {
   bt_expense_entries: "expenses",
   bt_goals: "goals",
   bt_liabilities: "liabilities",
-  bt_recurring_bills: "bills"
+  bt_recurring_bills: "bills",
+  bt_projects: "projects"
 };
 
 /**
@@ -79,9 +80,11 @@ const btAddExpense = (uid, payload) => btQueueWrite(uid, "bt_expense_entries", "
 const btAddGoal = (uid, payload) => btQueueWrite(uid, "bt_goals", "insert", payload);
 const btAddLiability = (uid, payload) => btQueueWrite(uid, "bt_liabilities", "insert", payload);
 const btAddBill = (uid, payload) => btQueueWrite(uid, "bt_recurring_bills", "insert", payload);
+const btAddProject = (uid, payload) => btQueueWrite(uid, "bt_projects", "insert", payload);
 const btUpdateGoal = (uid, id, payload) => btQueueWrite(uid, "bt_goals", "update", payload, id);
 const btUpdateLiability = (uid, id, payload) => btQueueWrite(uid, "bt_liabilities", "update", payload, id);
 const btUpdateBill = (uid, id, payload) => btQueueWrite(uid, "bt_recurring_bills", "update", payload, id);
+const btUpdateProject = (uid, id, payload) => btQueueWrite(uid, "bt_projects", "update", payload, id);
 const btDeleteEntry = (uid, table, id) => btQueueWrite(uid, table, "delete", null, id);
 
 /** bt_profiles is a single object per user, not an array — handled separately from btQueueWrite. */
@@ -123,6 +126,7 @@ async function btSync(uid) {
       if (payload && payload.goal_id && idMap[payload.goal_id]) payload = { ...payload, goal_id: idMap[payload.goal_id] };
       if (payload && payload.liability_id && idMap[payload.liability_id]) payload = { ...payload, liability_id: idMap[payload.liability_id] };
       if (payload && payload.bill_id && idMap[payload.bill_id]) payload = { ...payload, bill_id: idMap[payload.bill_id] };
+      if (payload && payload.project_id && idMap[payload.project_id]) payload = { ...payload, project_id: idMap[payload.project_id] };
 
       try {
         if (job.op === "insert") {
@@ -167,13 +171,14 @@ async function btPullSnapshot(uid) {
   twoYearsAgo.setFullYear(twoYearsAgo.getFullYear() - 2);
   const since = twoYearsAgo.toISOString().slice(0, 10);
 
-  const [profileRes, goalsRes, liabilitiesRes, billsRes, incomeRes, expenseRes] = await Promise.all([
+  const [profileRes, goalsRes, liabilitiesRes, billsRes, incomeRes, expenseRes, projectsRes] = await Promise.all([
     btSupabase.from("bt_profiles").select("*").eq("id", uid).single(),
     btSupabase.from("bt_goals").select("*").eq("user_id", uid).order("created_at", { ascending: false }),
     btSupabase.from("bt_liabilities").select("*").eq("user_id", uid).order("created_at", { ascending: false }),
     btSupabase.from("bt_recurring_bills").select("*").eq("user_id", uid).order("day_of_month", { ascending: true }),
     btSupabase.from("bt_income_entries").select("*").eq("user_id", uid).gte("entry_date", since).order("entry_date", { ascending: false }),
-    btSupabase.from("bt_expense_entries").select("*").eq("user_id", uid).gte("expense_date", since).order("expense_date", { ascending: false })
+    btSupabase.from("bt_expense_entries").select("*").eq("user_id", uid).gte("expense_date", since).order("expense_date", { ascending: false }),
+    btSupabase.from("bt_projects").select("*").eq("user_id", uid).order("created_at", { ascending: false })
   ]);
 
   const store = {
@@ -183,6 +188,7 @@ async function btPullSnapshot(uid) {
     bills: billsRes.data || [],
     income: incomeRes.data || [],
     expenses: expenseRes.data || [],
+    projects: projectsRes.data || [],
     syncedAt: new Date().toISOString()
   };
   btSaveStore(uid, store);
@@ -210,6 +216,67 @@ function btEscapeHtml(s) {
 
 function btSumInRange(entries, dateField, start, end) {
   return entries.filter((e) => btDateInRange(e[dateField], start, end)).reduce((s, e) => s + Number(e.amount), 0);
+}
+
+/* ── Business accounts: Profit & Loss, VAT summary, per-project filter.
+   Entirely separate from the personal budgeting calculations above — a
+   business account's Income/Expense Trackers use BUSINESS_* categories
+   instead, and none of the personal goal/budget logic applies here. ── */
+
+function btIsBusinessAccount(profile) {
+  return profile?.account_type === "business";
+}
+
+/** An entry's amount net of VAT — the figure that actually belongs in a P&L, since VAT collected/recoverable isn't the business's own revenue or cost. amount is always the gross figure the client actually paid or received; vat_amount is the VAT portion of it, only meaningful for a standard-rated line. */
+function btNetOfVat(entry) {
+  const vat = entry.vat_treatment === "standard_rated" ? Number(entry.vat_amount || 0) : 0;
+  return Number(entry.amount) - vat;
+}
+
+/**
+ * Profit & Loss for [start, end], optionally filtered to one project —
+ * figures a bookkeeper/accountant can work from directly, not a
+ * substitute for their own review or the actual tax filing.
+ */
+function btBusinessPL(store, start, end, projectId) {
+  const inRange = (e, field) => btDateInRange(e[field], start, end) && (!projectId || e.project_id === projectId);
+  const income = store.income.filter((e) => inRange(e, "entry_date"));
+  const expenses = store.expenses.filter((e) => inRange(e, "expense_date"));
+
+  const revenue = income.reduce((s, e) => s + btNetOfVat(e), 0);
+  const incomeByCategory = {};
+  income.forEach((e) => { const c = e.category || "Uncategorized"; incomeByCategory[c] = (incomeByCategory[c] || 0) + btNetOfVat(e); });
+  const expenseByCategory = {};
+  expenses.forEach((e) => { expenseByCategory[e.category] = (expenseByCategory[e.category] || 0) + btNetOfVat(e); });
+  const totalExpenses = Object.values(expenseByCategory).reduce((s, v) => s + v, 0);
+
+  const sortedEntries = (obj) => Object.entries(obj).sort((a, b) => b[1] - a[1]).map(([category, amount]) => ({ category, amount }));
+  return {
+    revenue,
+    totalExpenses,
+    netProfit: revenue - totalExpenses,
+    incomeByCategory: sortedEntries(incomeByCategory),
+    expensesByCategory: sortedEntries(expenseByCategory),
+    incomeCount: income.length,
+    expenseCount: expenses.length
+  };
+}
+
+/**
+ * Output VAT (collected on sales) minus input VAT (paid on eligible
+ * purchases) = net VAT payable (positive) or receivable (negative) for
+ * the period. Only standard-rated lines carry VAT — zero-rated, exempt,
+ * and out-of-scope entries contribute nothing to either side.
+ */
+function btVatSummary(store, start, end, projectId) {
+  const inRange = (e, field) => btDateInRange(e[field], start, end) && (!projectId || e.project_id === projectId);
+  const sumVat = (entries, field) => entries
+    .filter((e) => inRange(e, field) && e.vat_treatment === "standard_rated")
+    .reduce((s, e) => s + Number(e.vat_amount || 0), 0);
+
+  const outputVat = sumVat(store.income, "entry_date");
+  const inputVat = sumVat(store.expenses, "expense_date");
+  return { outputVat, inputVat, netVat: outputVat - inputVat };
 }
 
 /* ── Multi-currency: every rate is manual (client-set in Settings), never

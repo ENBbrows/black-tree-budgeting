@@ -109,15 +109,33 @@
     <h2 class="bf-toggle-head" id="settings-toggle">Settings <span class="bf-chevron" id="settings-chevron">▾</span></h2>
     <p class="bt-sub" id="settings-collapsed-hint" style="display:none;margin-bottom:0">One-time setup — name, currency, income, and other details you'll rarely need to touch again. Tap to edit.</p>
     <div class="bf-detail" id="settings-detail">
+    <label data-tip="Personal: budgeting, goals, and protection planning for yourself. Business: a small-business bookkeeping mode instead — Income/Expense use business categories, plus a Profit &amp; Loss and VAT summary. Switch any time; nothing is deleted either way.">Account type</label>
+    <div class="bt-chip-row" id="s-account-type-chips"></div>
+
     <label data-tip="How you'd like to be greeted on your Dashboard, e.g. &quot;Amii&quot; or &quot;Amii Leroux&quot;.">Full name</label>
     <input id="s-name" type="text" />
     <div class="bt-field-row">
       <div><label data-tip="The currency label shown next to your numbers, e.g. TTD, USD.">Currency</label><input id="s-currency" type="text" maxlength="6" /></div>
-      <div><label data-tip="Your gross annual income. Once set, this becomes the one fixed figure your Emergency Fund, Critical Illness Fund, Life Insurance, and Retirement Target all calculate from — instead of an estimate that shifts as you log more income through the year. Leave blank to keep using that estimate.">Annual income <span style="font-weight:400;color:var(--bt-muted)">(optional)</span></label><input id="s-annual-income" type="number" min="0" step="0.01" /></div>
+      <div class="bt-personal-only"><label data-tip="Your gross annual income. Once set, this becomes the one fixed figure your Emergency Fund, Critical Illness Fund, Life Insurance, and Retirement Target all calculate from — instead of an estimate that shifts as you log more income through the year. Leave blank to keep using that estimate.">Annual income <span style="font-weight:400;color:var(--bt-muted)">(optional)</span></label><input id="s-annual-income" type="number" min="0" step="0.01" /></div>
     </div>
-    <div class="bt-field-row">
+    <div class="bt-field-row bt-personal-only">
       <div><label data-tip="How many people your income supports (yourself included) — just a headcount, used to give the Cost of Living figures context. Doesn't affect any calculation.">Dependents</label><input id="s-dependents" type="number" min="0" step="1" /></div>
       <div><label data-tip="Used only to unlock the Burial Fund section of the Protection Planner once you turn 50 — it isn't shown before then.">Date of birth <span style="font-weight:400;color:var(--bt-muted)">(optional)</span></label><input id="s-dob" type="date" /></div>
+    </div>
+
+    <div class="bt-business-only" id="business-fields-wrap" style="display:none">
+      <label data-tip="Shown on your Books page and any export — the business this bookkeeping belongs to.">Business name</label>
+      <input id="s-business-name" type="text" placeholder="e.g. Leroux Contracting" />
+      <div class="bt-field-row">
+        <div>
+          <label data-tip="Turn on if you're VAT-registered with the Board of Inland Revenue. This just changes what the VAT summary on your Books page shows — it doesn't register you for anything.">VAT registered</label>
+          <div class="bt-chip-row" id="s-vat-registered-chips"></div>
+        </div>
+        <div><label data-tip="T&amp;T's standard VAT rate at time of writing is 12.5% — editable here since tax law changes. Used only as a default when logging a standard-rated entry; your own figure always wins. Confirm actual filing treatment with a licensed accountant.">VAT rate %</label><input id="s-vat-rate" type="number" min="0" step="0.01" /></div>
+      </div>
+      <label data-tip="Optional — your BIR VAT registration number, shown on your Books page for your own reference.">VAT number <span style="font-weight:400;color:var(--bt-muted)">(optional)</span></label>
+      <input id="s-vat-number" type="text" />
+      <p class="bt-sub" style="margin:8px 0 0;font-size:0.76rem">Books figures are for your own records and your accountant's use — not a substitute for their review or the actual filing.</p>
     </div>
 
     <div id="fx-rates-wrap" style="margin-top:16px;padding-top:14px;border-top:1px dashed var(--bt-border)">
@@ -168,8 +186,11 @@
   <div class="bt-quick-actions">
     <a href="statement.html" class="bt-btn bt-btn--ghost">📄 3-Month Cash Flow Statement</a>
   </div>
-  <div class="bt-quick-actions">
+  <div class="bt-quick-actions bt-personal-only">
     <a href="protection.html" class="bt-btn bt-btn--ghost">🛡️ Protection &amp; Retirement Planner</a>
+  </div>
+  <div class="bt-quick-actions bt-business-only" style="display:none">
+    <a href="books.html" class="bt-btn bt-btn--ghost">📊 Business Books (P&amp;L &amp; VAT)</a>
   </div>
   <div class="bt-quick-actions">
     <a href="library.html" class="bt-btn bt-btn--ghost">📚 Document Library</a>
@@ -177,19 +198,19 @@
 
   <div id="bt-flags"></div>
 
-  <div class="bt-card bt-invest-card" id="debt-cta" style="display:none">
+  <div class="bt-card bt-invest-card bt-personal-only" id="debt-cta" style="display:none">
     <h2>💳 Extra room to pay down debt</h2>
     <p id="debt-cta-text">—</p>
     <button class="bt-btn bt-btn--gold" id="debt-cta-btn">Log a payment</button>
   </div>
 
-  <div class="bt-card bt-invest-card" id="invest-cta" style="display:none">
+  <div class="bt-card bt-invest-card bt-personal-only" id="invest-cta" style="display:none">
     <h2>💬 Room to invest more</h2>
     <p id="invest-cta-text">Your budget's healthy and you have disposable income beyond essentials and savings — a good moment to talk with your advisor about your Emergency Fund, Critical Illness and Life Insurance coverage, retirement contributions, or other ways to secure your family's future.</p>
     <a class="bt-btn bt-btn--gold" id="invest-cta-btn" href="#" target="_blank" rel="noopener">Talk to Your Advisor</a>
   </div>
 
-  <div class="bt-card bt-invest-card" id="insurance-cta" style="display:none">
+  <div class="bt-card bt-invest-card bt-personal-only" id="insurance-cta" style="display:none">
     <h2>⏰ Insurance renewal coming up</h2>
     <p id="insurance-cta-text">—</p>
     <a class="bt-btn bt-btn--gold" href="protection.html" style="text-decoration:none">Review renewal</a>
@@ -204,7 +225,7 @@
       <h2>This Week</h2>
       <div class="bt-stat-grid" id="stats-week" style="grid-template-columns:1fr"></div>
     </div>
-    <div class="bt-card" id="vv-unlock-card">
+    <div class="bt-card bt-personal-only" id="vv-unlock-card">
       <h2>🌴 Vacation Vault Unlock</h2>
       <p class="bt-sub" id="vv-unlock-sub" style="margin-bottom:10px">—</p>
       <div id="vv-unlock-graphic"></div>
@@ -215,7 +236,7 @@
   </div>
 
   <div class="bt-top-grid" style="grid-template-columns: repeat(auto-fit, minmax(320px, 1fr))">
-    <div class="bt-card" id="goals-card">
+    <div class="bt-card bt-personal-only" id="goals-card">
       <div class="bt-section-head" style="margin:0 0 6px">
         <h2>Goals</h2>
         <button class="bt-btn bt-btn--ghost bt-btn--sm" id="toggle-goal-form">+ Add goal</button>
@@ -236,7 +257,7 @@
       </div>
     </div>
 
-    <div class="bt-card" id="debts-card">
+    <div class="bt-card bt-personal-only" id="debts-card">
       <div class="bt-section-head" style="margin:0 0 6px">
         <h2>Debt Tracker</h2>
         <button class="bt-btn bt-btn--ghost bt-btn--sm" id="toggle-debt-form">+ Add debt</button>
@@ -261,7 +282,7 @@
     </div>
   </div>
 
-  <div class="bt-card" id="badges-card">
+  <div class="bt-card bt-personal-only" id="badges-card">
     <h2>🏆 Achievements</h2>
     <p class="bt-sub" style="margin-bottom:14px">Each badge fills in with your progress and lights up fully once it's earned — one for every goal reached, one for every debt settled, and one for the Vacation Vault once it's unlocked and funded.</p>
     <div class="bt-badges-grid" id="badges-grid"></div>
@@ -317,7 +338,7 @@
     </div>
 
     <div>
-      <div class="bt-card" id="dip-card" style="display:none">
+      <div class="bt-card bt-personal-only" id="dip-card" style="display:none">
         <h2 data-tip="Only shows up once you've logged real income and expenses — a suggested order to put this month's leftover money to work, based on your actual numbers. Every figure is yours to change; nothing here is saved automatically.">💡 Disposable Income Plan</h2>
         <p class="bt-sub" id="dip-sub" style="margin-bottom:10px">—</p>
         <div id="dip-list"></div>
@@ -1088,6 +1109,10 @@
     renderPaymentBreakdown(store);
     renderCurrencyBreakdown(store);
 
+    // Last, so a business account's hide wins over whatever the
+    // personal-only conditional cards above just decided to show.
+    applyAccountTypeUI(store);
+
     renderSetupPasswordCard(store);
 
     if (!readOnly) {
@@ -1096,9 +1121,51 @@
       document.getElementById("s-annual-income").value = store.profile?.annual_income || "";
       document.getElementById("s-dependents").value = store.profile?.dependents_count || 0;
       document.getElementById("s-dob").value = store.profile?.date_of_birth || "";
+      document.getElementById("s-business-name").value = store.profile?.business_name || "";
+      document.getElementById("s-vat-rate").value = store.profile?.vat_rate ?? BT_CONFIG.DEFAULT_VAT_RATE;
+      document.getElementById("s-vat-number").value = store.profile?.vat_number || "";
+      renderAccountTypeChips(store.profile?.account_type || "personal");
+      renderVatRegisteredChips(!!store.profile?.vat_registered);
       renderFxRatesInputs(store);
       renderBudgetsInputs(store);
     }
+  }
+
+  /** Shows/hides every personal-only and business-only section based on the profile's account_type. Runs after the conditional personal cards above (debt/invest/insurance CTAs, Vacation Vault Unlock, Disposable Income Plan) so a business account's hide always wins, without the personal branch ever having to guess or override what those cards' own logic decided. */
+  function applyAccountTypeUI(store) {
+    const isBusiness = btIsBusinessAccount(store.profile);
+    if (isBusiness) {
+      document.querySelectorAll(".bt-personal-only").forEach((el) => { el.style.display = "none"; });
+    }
+    document.querySelectorAll(".bt-business-only").forEach((el) => {
+      el.style.display = isBusiness ? "" : "none";
+    });
+  }
+
+  function renderAccountTypeChips(current) {
+    const wrap = document.getElementById("s-account-type-chips");
+    const options = [{ value: "personal", label: "Personal" }, { value: "business", label: "Business" }];
+    wrap.innerHTML = options.map((o) => `<button type="button" class="bt-chip${o.value === current ? " bt-chip--selected" : ""}" data-value="${o.value}">${o.label}</button>`).join("");
+    wrap.querySelectorAll(".bt-chip").forEach((chip) => {
+      chip.addEventListener("click", () => {
+        wrap.querySelectorAll(".bt-chip").forEach((c) => c.classList.remove("bt-chip--selected"));
+        chip.classList.add("bt-chip--selected");
+        // Live preview before saving, same as every other settings field.
+        applyAccountTypeUI({ profile: { ...btLoadStore(btUid).profile, account_type: chip.dataset.value } });
+      });
+    });
+  }
+
+  function renderVatRegisteredChips(current) {
+    const wrap = document.getElementById("s-vat-registered-chips");
+    const options = [{ value: "false", label: "Not registered" }, { value: "true", label: "Registered" }];
+    wrap.innerHTML = options.map((o) => `<button type="button" class="bt-chip${o.value === String(current) ? " bt-chip--selected" : ""}" data-value="${o.value}">${o.label}</button>`).join("");
+    wrap.querySelectorAll(".bt-chip").forEach((chip) => {
+      chip.addEventListener("click", () => {
+        wrap.querySelectorAll(".bt-chip").forEach((c) => c.classList.remove("bt-chip--selected"));
+        chip.classList.add("bt-chip--selected");
+      });
+    });
   }
 
   function renderSetupPasswordCard(store) {
@@ -1304,7 +1371,16 @@
           const v = parseFloat(el.value);
           if (v > 0) category_budgets[el.dataset.category] = v;
         });
-        btUpdateProfile(btUid, { full_name, currency: curr, annual_income, dependents_count, date_of_birth, fx_rates, category_budgets });
+        const account_type = document.querySelector("#s-account-type-chips .bt-chip--selected")?.dataset.value || "personal";
+        const business_name = document.getElementById("s-business-name").value.trim() || null;
+        const vat_registered = document.querySelector("#s-vat-registered-chips .bt-chip--selected")?.dataset.value === "true";
+        const vat_number = document.getElementById("s-vat-number").value.trim() || null;
+        const vatRateVal = parseFloat(document.getElementById("s-vat-rate").value);
+        const vat_rate = vatRateVal >= 0 ? vatRateVal : BT_CONFIG.DEFAULT_VAT_RATE;
+        btUpdateProfile(btUid, {
+          full_name, currency: curr, annual_income, dependents_count, date_of_birth, fx_rates, category_budgets,
+          account_type, business_name, vat_registered, vat_number, vat_rate
+        });
         refreshGoalCategoryOptions();
         renderAll();
         toast("Settings saved");

@@ -92,6 +92,18 @@
     <div class="bt-chip-row" id="f-category-chips"></div>
     <p id="category-hint">Guessed from what you typed — tap to change, or tap more to add.</p>
 
+    <div id="biz-expense-fields" style="display:none">
+      <label data-tip="Was VAT charged on this purchase? Pick the treatment, then confirm the VAT portion of the amount above — we suggest it automatically at your account's VAT rate for a standard-rated purchase, but you can adjust it.">VAT treatment</label>
+      <div class="bt-chip-row" id="f-vat-chips"></div>
+      <div class="bt-field-row">
+        <div><label data-tip="The VAT portion of the amount above (not an extra charge on top) — only relevant for a standard-rated purchase.">VAT amount</label><input id="f-vat-amount" type="number" min="0" step="0.01" placeholder="0.00" /></div>
+        <div>
+          <label for="f-project" data-tip="Optional — tag this to a specific contract/job to see its own profitability on the Books page.">Project <span style="font-weight:400;color:var(--bt-muted)">(optional)</span></label>
+          <select id="f-project"><option value="">— none —</option></select>
+        </div>
+      </div>
+    </div>
+
     <div id="split-wrap" style="display:none">
       <label style="margin:0 0 8px" data-tip="How much of the total belongs to each category — defaults to an even split, adjust as needed. Makes Spending by Category accurate for a bill that covers more than one kind of spending.">Split amount across categories</label>
       <div id="split-list"></div>
@@ -148,6 +160,14 @@
   let scanLines = []; // raw OCR text lines from the most recent scan, for line-by-line category tagging
   let lineCategoryTags = {}; // line index -> category, for the tagged/struck-through display state
 
+  /** A business account's expense categories/VAT/project tagging replace the personal multi-category split entirely — one category, one VAT line, same way a bookkeeper enters a bill. */
+  function isBusinessNow() {
+    return btIsBusinessAccount(btLoadStore(btUid).profile);
+  }
+  function currentExpenseCategories() {
+    return isBusinessNow() ? BT_CONFIG.BUSINESS_EXPENSE_CATEGORIES : BT_CONFIG.EXPENSE_CATEGORIES;
+  }
+
   function toast(msg) {
     const el = document.getElementById("bt-toast");
     el.textContent = msg;
@@ -195,13 +215,22 @@
 
   function renderCategoryChips() {
     const wrap = document.getElementById("f-category-chips");
+    const isBiz = isBusinessNow();
     const current = new Set(selectedCategories());
-    wrap.innerHTML = BT_CONFIG.EXPENSE_CATEGORIES.map((c) =>
+    wrap.innerHTML = currentExpenseCategories().map((c) =>
       `<button type="button" class="bt-chip${current.has(c) ? " bt-chip--selected" : ""}" data-value="${btEscapeHtml(c)}">${btEscapeHtml(c)}</button>`
     ).join("");
+    document.getElementById("biz-expense-fields").style.display = isBiz ? "" : "none";
     wrap.querySelectorAll(".bt-chip").forEach((chip) => {
       chip.addEventListener("click", () => {
-        chip.classList.toggle("bt-chip--selected");
+        if (isBiz) {
+          // One category per business entry — same reasoning split VAT
+          // across categories can't: a bill maps to one GL account.
+          wrap.querySelectorAll(".bt-chip").forEach((c) => c.classList.remove("bt-chip--selected"));
+          chip.classList.add("bt-chip--selected");
+        } else {
+          chip.classList.toggle("bt-chip--selected");
+        }
         categoryManuallySet = true;
         document.getElementById("category-hint").classList.remove("show");
         onCategorySelectionChanged();
@@ -327,7 +356,10 @@
   /** Lets a mixed receipt (groceries + household items, say) be split across categories: check the lines that belong together, tap a category to tag them — sums those lines' guessed amounts into that category's split and selects its chip. */
   function renderScanLines() {
     const wrap = document.getElementById("scan-lines-wrap");
-    if (!scanLines.length) { wrap.style.display = "none"; return; }
+    // Line-by-line tagging is how a mixed receipt gets split across
+    // categories — not offered for a business entry, which is always
+    // one category (see renderCategoryChips).
+    if (!scanLines.length || isBusinessNow()) { wrap.style.display = "none"; return; }
     wrap.style.display = "";
 
     document.getElementById("scan-lines-list").innerHTML = scanLines.map((line, i) => {
@@ -341,7 +373,7 @@
     }).join("");
 
     const catWrap = document.getElementById("scan-lines-cat-chips");
-    catWrap.innerHTML = BT_CONFIG.EXPENSE_CATEGORIES.map((c) => `<button type="button" class="bt-chip" data-value="${btEscapeHtml(c)}">${btEscapeHtml(c)}</button>`).join("");
+    catWrap.innerHTML = currentExpenseCategories().map((c) => `<button type="button" class="bt-chip" data-value="${btEscapeHtml(c)}">${btEscapeHtml(c)}</button>`).join("");
     catWrap.querySelectorAll(".bt-chip").forEach((chip) => {
       chip.addEventListener("click", () => tagCheckedLines(chip.dataset.value));
     });
@@ -411,6 +443,55 @@
       paymentAccountSuggestions(store).map((n) => `<option value="${n}">`).join("");
   }
 
+  function renderVatChips() {
+    const wrap = document.getElementById("f-vat-chips");
+    const current = wrap.querySelector(".bt-chip--selected")?.dataset.value || "standard_rated";
+    wrap.innerHTML = BT_CONFIG.VAT_TREATMENTS.map((t) =>
+      `<button type="button" class="bt-chip${t.value === current ? " bt-chip--selected" : ""}" data-value="${t.value}">${t.label}</button>`
+    ).join("");
+    wrap.querySelectorAll(".bt-chip").forEach((chip) => {
+      chip.addEventListener("click", () => {
+        wrap.querySelectorAll(".bt-chip").forEach((c) => c.classList.remove("bt-chip--selected"));
+        chip.classList.add("bt-chip--selected");
+        suggestVatAmount();
+      });
+    });
+  }
+
+  /** Suggests the VAT portion of the amount entered (amount is gross/VAT-inclusive) at the account's own VAT rate — only when the field's still at its last suggestion, so it never overwrites a figure the client typed themselves. */
+  function suggestVatAmount() {
+    const treatment = document.querySelector("#f-vat-chips .bt-chip--selected")?.dataset.value;
+    const vatInput = document.getElementById("f-vat-amount");
+    if (treatment !== "standard_rated") { vatInput.value = ""; vatInput.dataset.suggested = ""; return; }
+    if (vatInput.value && vatInput.value !== vatInput.dataset.suggested) return;
+    const amount = parseFloat(document.getElementById("f-amount").value) || 0;
+    const rate = Number(btLoadStore(btUid).profile?.vat_rate ?? BT_CONFIG.DEFAULT_VAT_RATE);
+    const suggested = amount > 0 ? (amount * rate / (100 + rate)).toFixed(2) : "";
+    vatInput.value = suggested;
+    vatInput.dataset.suggested = suggested;
+  }
+
+  function populateProjectOptions() {
+    const sel = document.getElementById("f-project");
+    const store = btLoadStore(btUid);
+    const current = sel.value;
+    const currentLabel = sel.options[sel.selectedIndex]?.textContent;
+    const active = store.projects.filter((p) => p.status === "active");
+    sel.innerHTML = '<option value="">— none —</option>' +
+      active.map((p) => `<option value="${p.id}">${btEscapeHtml(p.name)}</option>`).join("") +
+      '<option value="__new__">+ New project…</option>';
+    if (active.some((p) => p.id === current)) {
+      sel.value = current;
+    } else if (current && current !== "__new__") {
+      // A just-created project's temp id can be replaced by the server's
+      // real one mid-edit (a background sync lands while the form is
+      // still open) — re-match by name instead of silently losing the
+      // selection the client just made.
+      const match = active.find((p) => p.name === currentLabel);
+      if (match) sel.value = match.id;
+    }
+  }
+
   async function init() {
     const user = await btRequireAuth();
     if (!user) return;
@@ -418,7 +499,23 @@
 
     document.getElementById("f-date").value = new Date().toISOString().slice(0, 10);
     renderCategoryChips();
-    document.getElementById("f-amount").addEventListener("input", renderSplitSection);
+    renderVatChips();
+    populateProjectOptions();
+    document.getElementById("f-amount").addEventListener("input", () => { renderSplitSection(); suggestVatAmount(); });
+    document.getElementById("f-project").addEventListener("change", async (e) => {
+      if (e.target.value !== "__new__") return;
+      const name = prompt("Project / contract name:");
+      if (!name || !name.trim()) { e.target.value = ""; return; }
+      const tempId = btAddProject(btUid, { name: name.trim(), status: "active" });
+      populateProjectOptions();
+      e.target.value = tempId;
+      // Resolve the temp id to its real server one right away, while
+      // online, so the form never submits an id nothing points at yet —
+      // offline, it stays queued and the sync engine's own idMap
+      // chaining resolves it once the project and whatever references
+      // it eventually sync together.
+      if (navigator.onLine) { await btSync(btUid); populateProjectOptions(); }
+    });
 
     document.getElementById("f-desc").addEventListener("input", tryAutoGuessCategory);
 
@@ -471,6 +568,7 @@
     updateLinkOptions();
     btSync(btUid).then(() => {
       renderRecent(); updateLinkOptions(); refreshPaymentAccountSuggestions();
+      renderCategoryChips(); renderVatChips(); populateProjectOptions();
       if (pendingLinkId) document.getElementById("f-link").value = pendingLinkId;
     });
 
@@ -494,6 +592,13 @@
         const payload = { category, amount, expense_date, notes, goal_id: null, liability_id: null, payment_type, payment_account };
         if (linkId && linkSel.dataset.kind === "goal") payload.goal_id = linkId;
         if (linkId && linkSel.dataset.kind === "liability") payload.liability_id = linkId;
+        if (isBusinessNow()) {
+          const vatTreatment = document.querySelector("#f-vat-chips .bt-chip--selected")?.dataset.value || null;
+          const vatAmountVal = parseFloat(document.getElementById("f-vat-amount").value);
+          payload.vat_treatment = vatTreatment;
+          payload.vat_amount = vatTreatment === "standard_rated" && vatAmountVal >= 0 ? vatAmountVal : null;
+          payload.project_id = document.getElementById("f-project").value || null;
+        }
         btAddExpense(btUid, payload);
       } else {
         const allocated = cats.reduce((s, c) => s + (splitAmounts[c] || 0), 0);
@@ -530,6 +635,9 @@
       document.getElementById("f-amount").value = "";
       document.getElementById("f-payment-account").value = "";
       document.getElementById("lib-file").value = "";
+      document.getElementById("f-vat-amount").value = "";
+      document.getElementById("f-vat-amount").dataset.suggested = "";
+      document.getElementById("f-project").value = "";
       document.getElementById("scan-status").classList.remove("show");
       document.getElementById("category-hint").classList.remove("show");
       hideScanBubble();

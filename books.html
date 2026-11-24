@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Business Books — Black Tree</title>
+<link rel="apple-touch-icon" href="assets/icon-180.png">
+<link rel="icon" href="assets/icon-32.png">
+<meta name="theme-color" content="#FAF7F2">
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="theme.css" />
+<style>
+  .books-actions { display: flex; gap: 10px; margin-bottom: 18px; flex-wrap: wrap; }
+  .books-actions .bt-btn { width: auto; flex: none; }
+  .books-meta { color: var(--bt-muted); font-size: 0.88rem; margin: -8px 0 16px; }
+  .books-filters { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 18px; }
+  .books-col-head { font-size: 0.76rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--bt-muted); margin: 16px 0 4px; }
+  .books-col-head:first-child { margin-top: 4px; }
+  .books-subtotal { display: flex; justify-content: space-between; padding: 10px 0 4px; font-weight: 700; font-family: var(--bt-font-head); border-top: 1px solid var(--bt-border); margin-top: 4px; }
+  .books-net { display: flex; justify-content: space-between; padding: 12px 0 0; margin-top: 10px; border-top: 2px solid var(--bt-ink); font-family: var(--bt-font-head); font-weight: 700; font-size: 1.05rem; }
+  .books-net.neg { color: var(--bt-red); }
+  .books-net.pos { color: var(--bt-green); }
+  .books-footer-note { font-size: 0.78rem; color: var(--bt-muted); margin-top: 28px; line-height: 1.6; }
+
+  @media print {
+    .no-print { display: none !important; }
+    body { background: #fff; }
+    .bt-container--wide { max-width: 100%; padding: 0 8px; }
+    .bt-card { box-shadow: none; border: 1px solid #ccc; break-inside: avoid; }
+    .bt-bottom-nav { display: none !important; }
+  }
+</style>
+</head>
+<body>
+<div class="bt-header"><img src="assets/emblem-gold.png" alt="" class="bt-emblem">
+    <div class="bt-wordmark-stack">
+      <img src="assets/wordmark-top-gold.png" alt="Black Tree" class="bt-wordmark-title">
+      <img src="assets/wordmark-bottom-gold.png" alt="Investments" class="bt-wordmark-sub">
+    </div></div>
+
+<div class="bt-container bt-container--wide">
+  <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; flex-wrap:wrap; gap:10px">
+    <h1>📊 Business Books</h1>
+  </div>
+  <p class="books-meta" id="books-meta">—</p>
+
+  <div class="bt-card" id="books-gate" style="display:none">
+    <h2>This page is for Business accounts</h2>
+    <p class="bt-sub">Switch your account type to Business in Dashboard → Settings to use the Profit &amp; Loss and VAT summary.</p>
+    <a href="dashboard.html" class="bt-btn bt-btn--gold" style="text-decoration:none;display:inline-block;width:auto">Go to Settings</a>
+  </div>
+
+  <div id="books-body" style="display:none">
+    <div class="books-actions no-print">
+      <button class="bt-btn bt-btn--gold" id="print-btn">🖨️ Print / Save as PDF</button>
+      <button class="bt-btn bt-btn--ghost" id="csv-btn">⬇️ Export CSV</button>
+      <a href="dashboard.html" class="bt-btn bt-btn--ghost">← Back to Dashboard</a>
+    </div>
+
+    <div class="books-filters no-print">
+      <div class="bt-chip-row" id="period-chips"></div>
+      <select id="project-filter" style="max-width:220px"><option value="">All projects</option></select>
+    </div>
+
+    <div class="bt-card">
+      <h2>Profit &amp; Loss</h2>
+      <p class="bt-sub" id="pl-range">—</p>
+
+      <div class="books-col-head">Revenue</div>
+      <div id="pl-income-rows"></div>
+      <div class="books-subtotal"><span>Total revenue</span><span id="pl-revenue-total">—</span></div>
+
+      <div class="books-col-head">Expenses</div>
+      <div id="pl-expense-rows"></div>
+      <div class="books-subtotal"><span>Total expenses</span><span id="pl-expense-total">—</span></div>
+
+      <div class="books-net" id="pl-net"><span>Net profit</span><span id="pl-net-amount">—</span></div>
+    </div>
+
+    <div class="bt-card">
+      <h2>VAT Summary</h2>
+      <p class="bt-sub">Standard-rated lines only. Figures are net VAT for your own records — confirm the actual filing treatment with your accountant.</p>
+      <div class="bt-list-row"><div>Output VAT (collected on sales)</div><div class="amt" id="vat-output">—</div></div>
+      <div class="bt-list-row"><div>Input VAT (paid on purchases)</div><div class="amt" id="vat-input">—</div></div>
+      <div class="books-net" id="vat-net"><span>Net VAT</span><span id="vat-net-amount">—</span></div>
+      <p class="bt-sub" id="vat-net-label" style="margin-top:4px">—</p>
+    </div>
+
+    <p class="books-footer-note">Generated by Black Tree Budgeting on <span id="books-generated"></span>, using figures logged in the app for this period, net of VAT. These are bookkeeping figures for your own records and your accountant's use — not a substitute for their review or the actual tax filing.</p>
+  </div>
+</div>
+
+<nav class="bt-bottom-nav no-print">
+  <a href="income.html">Income</a>
+  <a href="expense.html">Expense</a>
+  <a href="library.html">Library</a>
+  <a href="dashboard.html">Dashboard</a>
+</nav>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="config.js"></script>
+<script src="auth.js"></script>
+<script src="store.js"></script>
+<script>
+  let btUid = null;
+  let currentRange = null;
+  let currentProjectId = "";
+
+  function fmtMoney(n, currency) {
+    return currency + " " + Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  function periodRanges(today = new Date()) {
+    const fmt = (x) => x.toISOString().slice(0, 10);
+    const thisMonthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+    const lastMonthStart = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+    const lastMonthEnd = new Date(today.getFullYear(), today.getMonth(), 0);
+    const yearStart = new Date(today.getFullYear(), 0, 1);
+    return {
+      month: { label: "This Month", start: fmt(thisMonthStart), end: fmt(today) },
+      lastMonth: { label: "Last Month", start: fmt(lastMonthStart), end: fmt(lastMonthEnd) },
+      year: { label: "This Year", start: fmt(yearStart), end: fmt(today) },
+      all: { label: "All Time", start: "2000-01-01", end: fmt(today) }
+    };
+  }
+
+  function renderPeriodChips(ranges) {
+    const wrap = document.getElementById("period-chips");
+    const keys = Object.keys(ranges);
+    wrap.innerHTML = keys.map((k) => `<button type="button" class="bt-chip${k === "month" ? " bt-chip--selected" : ""}" data-key="${k}">${ranges[k].label}</button>`).join("");
+    wrap.querySelectorAll(".bt-chip").forEach((chip) => {
+      chip.addEventListener("click", () => {
+        wrap.querySelectorAll(".bt-chip").forEach((c) => c.classList.remove("bt-chip--selected"));
+        chip.classList.add("bt-chip--selected");
+        currentRange = ranges[chip.dataset.key];
+        renderBooks();
+      });
+    });
+  }
+
+  function renderProjectFilter(store) {
+    const sel = document.getElementById("project-filter");
+    sel.innerHTML = '<option value="">All projects</option>' +
+      store.projects.map((p) => `<option value="${p.id}">${btEscapeHtml(p.name)}${p.status === "completed" ? " (completed)" : ""}</option>`).join("");
+    sel.addEventListener("change", () => { currentProjectId = sel.value; renderBooks(); });
+  }
+
+  function renderBooks() {
+    const store = btLoadStore(btUid);
+    const currency = store.profile?.currency || "TTD";
+    const { start, end } = currentRange;
+    const projectId = currentProjectId || null;
+
+    document.getElementById("pl-range").textContent = `${start} to ${end}` + (projectId ? ` · ${store.projects.find((p) => p.id === projectId)?.name || ""}` : "");
+
+    const pl = btBusinessPL(store, start, end, projectId);
+    document.getElementById("pl-income-rows").innerHTML = pl.incomeByCategory.length
+      ? pl.incomeByCategory.map((r) => `<div class="bt-list-row"><div>${btEscapeHtml(r.category)}</div><div class="amt">${fmtMoney(r.amount, currency)}</div></div>`).join("")
+      : '<div class="bt-empty">No income logged this period.</div>';
+    document.getElementById("pl-expense-rows").innerHTML = pl.expensesByCategory.length
+      ? pl.expensesByCategory.map((r) => `<div class="bt-list-row"><div>${btEscapeHtml(r.category)}</div><div class="amt">${fmtMoney(r.amount, currency)}</div></div>`).join("")
+      : '<div class="bt-empty">No expenses logged this period.</div>';
+    document.getElementById("pl-revenue-total").textContent = fmtMoney(pl.revenue, currency);
+    document.getElementById("pl-expense-total").textContent = fmtMoney(pl.totalExpenses, currency);
+    document.getElementById("pl-net-amount").textContent = fmtMoney(pl.netProfit, currency);
+    document.getElementById("pl-net").className = "books-net " + (pl.netProfit >= 0 ? "pos" : "neg");
+
+    const vat = btVatSummary(store, start, end, projectId);
+    document.getElementById("vat-output").textContent = fmtMoney(vat.outputVat, currency);
+    document.getElementById("vat-input").textContent = fmtMoney(vat.inputVat, currency);
+    document.getElementById("vat-net-amount").textContent = fmtMoney(Math.abs(vat.netVat), currency);
+    document.getElementById("vat-net").className = "books-net " + (vat.netVat >= 0 ? "neg" : "pos");
+    document.getElementById("vat-net-label").textContent = vat.netVat >= 0
+      ? "Net VAT payable to the Board of Inland Revenue for this period."
+      : "Net VAT receivable (a credit) for this period.";
+
+    window._btBooksExport = { pl, vat, start, end, currency };
+  }
+
+  function exportCsv() {
+    const { pl, vat, start, end, currency } = window._btBooksExport || {};
+    if (!pl) return;
+    const lines = [
+      `Black Tree Business Books,${start} to ${end}`,
+      "",
+      "Profit & Loss", "Category,Amount (" + currency + ")",
+      ...pl.incomeByCategory.map((r) => `"${r.category}",${r.amount.toFixed(2)}`),
+      `Total revenue,${pl.revenue.toFixed(2)}`,
+      "",
+      ...pl.expensesByCategory.map((r) => `"${r.category}",${r.amount.toFixed(2)}`),
+      `Total expenses,${pl.totalExpenses.toFixed(2)}`,
+      `Net profit,${pl.netProfit.toFixed(2)}`,
+      "",
+      "VAT Summary",
+      `Output VAT,${vat.outputVat.toFixed(2)}`,
+      `Input VAT,${vat.inputVat.toFixed(2)}`,
+      `Net VAT,${vat.netVat.toFixed(2)}`
+    ];
+    const blob = new Blob([lines.join("\n")], { type: "text/csv" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `black-tree-books_${start}_to_${end}.csv`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
+  async function init() {
+    const user = await btRequireAuth();
+    if (!user) return;
+    btUid = window.btCurrentUserId = user.id;
+
+    await btSync(btUid).catch(() => {});
+    const store = btLoadStore(btUid);
+
+    if (!btIsBusinessAccount(store.profile)) {
+      document.getElementById("books-gate").style.display = "";
+      document.getElementById("books-meta").textContent = "Business-only feature";
+      return;
+    }
+
+    document.getElementById("books-body").style.display = "";
+    document.getElementById("books-meta").textContent = store.profile?.business_name || store.profile?.full_name || "Your business";
+    document.getElementById("books-generated").textContent = new Date().toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" });
+
+    const ranges = periodRanges();
+    currentRange = ranges.month;
+    renderPeriodChips(ranges);
+    renderProjectFilter(store);
+    renderBooks();
+
+    document.getElementById("print-btn").addEventListener("click", () => window.print());
+    document.getElementById("csv-btn").addEventListener("click", exportCsv);
+  }
+  init();
+</script>
+</body>
+</html>
