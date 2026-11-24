@@ -43,6 +43,13 @@ const BT_CONFIG = {
   GOAL_LINK_CATEGORY: "Savings & Investments",
   DEBT_LINK_CATEGORY: "Debt Repayment",
 
+  /* The Dashboard's "Savings Wins" card: one point per this much (in the
+     client's home currency) logged lifetime under Savings & Investments
+     or Charity / Tithe / Zakat — purely derived from the ledger, nothing
+     stored separately. */
+  SAVINGS_WINS_CATEGORIES: ["Savings & Investments", "Charity / Tithe / Zakat"],
+  POINTS_PER_UNIT: 50,
+
   /* ── Business accounts ──────────────────────────────────────────
      A second account type (Settings → Account Type) for a client
      running a small business — built with a contracting business in

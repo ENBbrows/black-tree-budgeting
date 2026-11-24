@@ -1144,6 +1144,50 @@ function btVacationVaultSuggestion(disposable, pct) {
   return { pct: p, monthlyContribution: Math.max(0, disposable) * (p / 100) };
 }
 
+/**
+ * The Dashboard's "Savings Wins" card — a monthly trend, a streak, and a
+ * points total for Savings & Investments + Charity / Tithe / Zakat
+ * spending. Points are derived straight from the ledger (lifetime total ÷
+ * BT_CONFIG.POINTS_PER_UNIT) rather than a separately stored counter, so
+ * there's nothing that can drift out of sync with it. Expense entries are
+ * always logged in the client's home currency (unlike income, which can
+ * carry its own), so no FX conversion is needed to total them.
+ */
+function btSavingsWins(store, viewCurrency, profile) {
+  const home = profile?.currency || "TTD";
+  const cats = BT_CONFIG.SAVINGS_WINS_CATEGORIES || ["Savings & Investments", "Charity / Tithe / Zakat"];
+  const relevant = store.expenses.filter((e) => cats.includes(e.category));
+
+  const monthBounds = (monthsAgo) => {
+    const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - monthsAgo);
+    const start = d.toISOString().slice(0, 10);
+    const endD = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+    return { start, end: endD.toISOString().slice(0, 10) };
+  };
+  const totalIn = (start, end) => relevant.filter((e) => btDateInRange(e.expense_date, start, end)).reduce((s, e) => s + Number(e.amount), 0);
+
+  const thisMonthRaw = totalIn(monthBounds(0).start, monthBounds(0).end);
+  const lastMonthRaw = totalIn(monthBounds(1).start, monthBounds(1).end);
+
+  let streakMonths = 0;
+  for (let i = 0; i < 60; i++) {
+    const b = monthBounds(i);
+    if (totalIn(b.start, b.end) > 0) streakMonths++; else break;
+  }
+
+  const lifetimeTotal = relevant.reduce((s, e) => s + Number(e.amount), 0);
+  const unit = BT_CONFIG.POINTS_PER_UNIT || 50;
+  const toView = (n) => btConvertAmount(n, home, viewCurrency || home, profile).value;
+
+  return {
+    thisMonthTotal: toView(thisMonthRaw),
+    lastMonthTotal: toView(lastMonthRaw),
+    streakMonths,
+    points: Math.floor(lifetimeTotal / unit),
+    pointsPerUnit: unit
+  };
+}
+
 /** Advances a date forward by one period of the given income frequency. Returns null for a frequency with no regular period (e.g. "One-time"). */
 function btAdvanceByFrequency(date, frequency) {
   const d = new Date(date.getTime());

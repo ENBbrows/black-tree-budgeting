@@ -91,6 +91,20 @@
     <div id="timeline-list"></div>
   </div>
 
+  <div class="bt-card" id="savings-wins-card">
+    <h2>🏆 Savings Wins</h2>
+    <p class="bt-sub" id="savings-wins-sub" style="margin-bottom:12px">—</p>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <span style="font-size:0.85rem;color:var(--bt-muted)">Points earned</span>
+      <span style="font-size:1.3rem;font-weight:700;color:var(--bt-gold)" id="savings-wins-points">—</span>
+    </div>
+    <p class="bt-sub" id="savings-wins-incentive" style="margin-bottom:12px">—</p>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <button type="button" class="bt-btn bt-btn--gold bt-btn--sm" id="savings-boost-btn">+ Boost Savings</button>
+      <button type="button" class="bt-btn bt-btn--ghost bt-btn--sm" id="charity-boost-btn">+ Give to Charity</button>
+    </div>
+  </div>
+
   <div class="bt-view-toggle" id="view-toggle">
     <span class="lbl">Display style:</span>
     <button class="bt-btn bt-btn--ghost bt-btn--sm" data-mode="bars" type="button">▬ Bars</button>
@@ -324,6 +338,27 @@
     wrap.innerHTML = items.map((it) => `<div class="bt-list-row-plain"><span>${it.icon} ${btEscapeHtml(it.label)}</span><span style="color:var(--bt-muted)">${it.date}</span></div>`).join("");
   }
 
+  /** Business accounts don't have a "Savings & Investments" or "Charity" category at all (they use business-only categories), so this card has nothing to show them. */
+  function renderSavingsWins(store) {
+    const card = document.getElementById("savings-wins-card");
+    if (btIsBusinessAccount(store.profile)) { card.style.display = "none"; return; }
+    card.style.display = "";
+    const wins = btSavingsWins(store, viewCurrency, store.profile);
+    const sub = document.getElementById("savings-wins-sub");
+    if (wins.streakMonths >= 2) {
+      sub.textContent = `🔥 ${wins.streakMonths}-month streak — you've put something toward savings or giving every month in a row.`;
+    } else if (wins.thisMonthTotal > wins.lastMonthTotal) {
+      sub.textContent = `📈 Up from ${fmtMoney(wins.lastMonthTotal)} last month to ${fmtMoney(wins.thisMonthTotal)} this month — nice work.`;
+    } else if (wins.thisMonthTotal > 0) {
+      sub.textContent = `You've put ${fmtMoney(wins.thisMonthTotal)} toward savings or giving this month.`;
+    } else {
+      sub.textContent = `Nothing logged toward savings or giving yet this month — even a little counts.`;
+    }
+    document.getElementById("savings-wins-points").textContent = wins.points.toLocaleString();
+    document.getElementById("savings-wins-incentive").textContent =
+      `Every extra ${fmtHome(wins.pointsPerUnit)} you put toward savings or charity earns another point — keep it going.`;
+  }
+
   function renderStats(elId, period) {
     const el = document.getElementById(elId);
     const netClass = period.net > 0 ? "pos" : period.net < 0 ? "neg" : "";
@@ -549,6 +584,7 @@
     renderHealthStatus(flags);
     renderAttentionList(store, summary, flags);
     renderTimeline(store);
+    renderSavingsWins(store);
     renderWeekSpend(summary.periods.week);
     renderStats("stats-month", summary.periods.month);
     renderStats("stats-ytd", summary.periods.ytd);
@@ -562,6 +598,8 @@
   function setReadOnly() {
     document.querySelector(".bt-quick-actions").style.display = "none";
     document.getElementById("scan-fab-btn").style.display = "none";
+    document.getElementById("savings-boost-btn").style.display = "none";
+    document.getElementById("charity-boost-btn").style.display = "none";
   }
 
   async function init() {
@@ -598,6 +636,15 @@
     });
 
     document.getElementById("bt-logout").addEventListener("click", async () => { await btSignOut(); window.location.replace("login.html"); });
+
+    document.getElementById("savings-boost-btn").addEventListener("click", () => {
+      sessionStorage.setItem("bt_expense_prefill", JSON.stringify({ category: "Savings & Investments", amount: BT_CONFIG.POINTS_PER_UNIT }));
+      window.location.href = "expense.html";
+    });
+    document.getElementById("charity-boost-btn").addEventListener("click", () => {
+      sessionStorage.setItem("bt_expense_prefill", JSON.stringify({ category: "Charity / Tithe / Zakat", amount: BT_CONFIG.POINTS_PER_UNIT }));
+      window.location.href = "expense.html";
+    });
 
     if (!readOnly) btWireScanFab("scan-fab-btn", "scan-fab-file");
 
