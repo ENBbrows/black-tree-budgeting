@@ -229,7 +229,10 @@
     const idx = orderArr.indexOf(key);
     return (idx >= 0 && idx < BT_PALETTE.length) ? BT_PALETTE[idx] : BT_MUTED;
   }
-  function categoryColor(cat) { return paletteColor(BT_CONFIG.EXPENSE_CATEGORIES, cat); }
+  function categoryColor(cat) {
+    const list = btIsBusinessAccount(btLoadStore(btUid).profile) ? BT_CONFIG.BUSINESS_EXPENSE_CATEGORIES : BT_CONFIG.EXPENSE_CATEGORIES;
+    return paletteColor(list, cat);
+  }
   function paymentColor(method) { return paletteColor(BT_CONFIG.PAYMENT_TYPES, method); }
   function currencyColor(cur, home) { return paletteColor([home, ...(BT_CONFIG.EXTRA_CURRENCIES || []).filter((c) => c !== home)], cur); }
 

@@ -340,10 +340,13 @@
   function renderBudgetsInputs(store) {
     const budgets = store.profile?.category_budgets || {};
     const wrap = document.getElementById("budgets-list");
+    const isBusiness = btIsBusinessAccount(store.profile);
+    const categories = isBusiness ? (BT_CONFIG.BUSINESS_EXPENSE_CATEGORIES || []) : (BT_CONFIG.EXPENSE_CATEGORIES || []);
     const basis = btAnnualIncomeBasis(store, store.profile?.currency);
     const monthlyIncome = basis.annualIncome / 12;
-    wrap.innerHTML = (BT_CONFIG.EXPENSE_CATEGORIES || []).map((cat) => {
-      const guide = (BT_CONFIG.CATEGORY_BUDGET_GUIDANCE || {})[cat];
+    wrap.innerHTML = categories.map((cat) => {
+      // The Need/Want/Savings/% of income framing is personal-budgeting guidance — business categories have no entry here and just skip the badge/hint, which is correct: a van rental isn't a "want".
+      const guide = isBusiness ? null : (BT_CONFIG.CATEGORY_BUDGET_GUIDANCE || {})[cat];
       const badge = guide ? BUDGET_TYPE_BADGE[guide.type] : "";
       let hint = "";
       if (guide && guide.lowPct == null) {
@@ -367,10 +370,11 @@
     }).join("");
   }
 
-  /** The at-a-glance view for Category budgets — just what's actually set, so re-opening Settings doesn't dump every category's blank input box in front of the ones you actually care about. */
+  /** The at-a-glance view for Category budgets — just what's actually set, so re-opening Settings doesn't dump every category's blank input box in front of the ones you actually care about. Filtered to the account's current category list, so a budget set before switching Personal/Business doesn't linger here for a category that no longer applies. */
   function renderBudgetsView(store) {
     const budgets = store.profile?.category_budgets || {};
-    const set = Object.entries(budgets).filter(([, v]) => v > 0);
+    const categories = btIsBusinessAccount(store.profile) ? (BT_CONFIG.BUSINESS_EXPENSE_CATEGORIES || []) : (BT_CONFIG.EXPENSE_CATEGORIES || []);
+    const set = Object.entries(budgets).filter(([cat, v]) => v > 0 && categories.includes(cat));
     document.getElementById("budgets-view").innerHTML = set.length
       ? set.map(([cat, amt]) => `<div class="bt-list-row"><div>${btEscapeHtml(cat)}</div><div class="amt">${fmtHome(amt)}/mo</div></div>`).join("")
       : '<div class="bt-empty">No budgets set yet.</div>';
