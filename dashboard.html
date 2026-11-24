@@ -29,6 +29,10 @@
   .bt-health-title { font-family: var(--bt-font-head); font-weight:700; font-size: 1.1rem; }
   .bt-health-sub { font-size: 0.85rem; margin-top: 2px; opacity: 0.85; }
 
+  .bt-savings-chip { align-items:center; gap:10px; background: var(--bt-cream); border: 1px solid var(--bt-border); border-radius: 999px; padding: 8px 14px; margin: 4px 0 18px; width: fit-content; }
+  .bt-savings-chip .pts { font-size: 0.86rem; font-weight: 600; white-space: nowrap; }
+  .bt-savings-chip button { background: var(--bt-white); border: 1px solid var(--bt-border); border-radius: 50%; width: 32px; height: 32px; font-size: 1rem; line-height: 1; cursor: pointer; transition: transform .15s; }
+  .bt-savings-chip button:hover { transform: scale(1.12); }
   .bt-view-toggle { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin: 14px 0 4px; }
   .bt-view-toggle .lbl { font-size:0.8rem; color:var(--bt-muted); }
   .bt-view-toggle button.active { background: var(--bt-gold); color: var(--bt-ink); border-color: var(--bt-gold); }
@@ -91,18 +95,10 @@
     <div id="timeline-list"></div>
   </div>
 
-  <div class="bt-card" id="savings-wins-card">
-    <h2>🏆 Savings Wins</h2>
-    <p class="bt-sub" id="savings-wins-sub" style="margin-bottom:12px">—</p>
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-      <span style="font-size:0.85rem;color:var(--bt-muted)">Points earned</span>
-      <span style="font-size:1.3rem;font-weight:700;color:var(--bt-gold)" id="savings-wins-points">—</span>
-    </div>
-    <p class="bt-sub" id="savings-wins-incentive" style="margin-bottom:12px">—</p>
-    <div style="display:flex;gap:10px;flex-wrap:wrap">
-      <button type="button" class="bt-btn bt-btn--gold bt-btn--sm" id="savings-boost-btn">+ Boost Savings</button>
-      <button type="button" class="bt-btn bt-btn--ghost bt-btn--sm" id="charity-boost-btn">+ Give to Charity</button>
-    </div>
+  <div id="savings-wins-chip" class="bt-savings-chip" style="display:flex">
+    <span class="pts">🏆 <strong id="savings-wins-points">0</strong> pts</span>
+    <button type="button" id="savings-boost-btn" title="Boost Savings" aria-label="Boost Savings">💰</button>
+    <button type="button" id="charity-boost-btn" title="Give to Charity" aria-label="Give to Charity">🤲</button>
   </div>
 
   <div class="bt-view-toggle" id="view-toggle">
@@ -341,25 +337,18 @@
     wrap.innerHTML = items.map((it) => `<div class="bt-list-row-plain"><span>${it.icon} ${btEscapeHtml(it.label)}</span><span style="color:var(--bt-muted)">${it.date}</span></div>`).join("");
   }
 
-  /** Business accounts don't have a "Savings & Investments" or "Charity" category at all (they use business-only categories), so this card has nothing to show them. */
+  /** Business accounts don't have a "Savings & Investments" or "Charity" category at all (they use business-only categories), so this chip has nothing to show them. Kept small on purpose — the points count is the whole story, the trend/streak just rides along as a tooltip on hover/tap-and-hold. */
   function renderSavingsWins(store) {
-    const card = document.getElementById("savings-wins-card");
-    if (btIsBusinessAccount(store.profile)) { card.style.display = "none"; return; }
-    card.style.display = "";
+    const chip = document.getElementById("savings-wins-chip");
+    if (btIsBusinessAccount(store.profile)) { chip.style.display = "none"; return; }
+    chip.style.display = "flex";
     const wins = btSavingsWins(store, viewCurrency, store.profile);
-    const sub = document.getElementById("savings-wins-sub");
-    if (wins.streakMonths >= 2) {
-      sub.textContent = `🔥 ${wins.streakMonths}-month streak — you've put something toward savings or giving every month in a row.`;
-    } else if (wins.thisMonthTotal > wins.lastMonthTotal) {
-      sub.textContent = `📈 Up from ${fmtMoney(wins.lastMonthTotal)} last month to ${fmtMoney(wins.thisMonthTotal)} this month — nice work.`;
-    } else if (wins.thisMonthTotal > 0) {
-      sub.textContent = `You've put ${fmtMoney(wins.thisMonthTotal)} toward savings or giving this month.`;
-    } else {
-      sub.textContent = `Nothing logged toward savings or giving yet this month — even a little counts.`;
-    }
     document.getElementById("savings-wins-points").textContent = wins.points.toLocaleString();
-    document.getElementById("savings-wins-incentive").textContent =
-      `Every extra ${fmtHome(wins.pointsPerUnit)} you put toward savings or charity earns another point — keep it going.`;
+    let tip;
+    if (wins.streakMonths >= 2) tip = `🔥 ${wins.streakMonths}-month streak putting something toward savings or giving.`;
+    else if (wins.thisMonthTotal > wins.lastMonthTotal) tip = `📈 Up from ${fmtMoney(wins.lastMonthTotal)} last month to ${fmtMoney(wins.thisMonthTotal)} this month.`;
+    else tip = `Every extra ${fmtHome(wins.pointsPerUnit)} toward savings or charity earns another point.`;
+    chip.title = tip;
   }
 
   function renderStats(elId, period) {
