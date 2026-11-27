@@ -14,10 +14,11 @@ const btStoreKey = (uid) => `bt_store_${uid}`;
 const btQueueKey = (uid) => `bt_queue_${uid}`;
 
 function btEmptyStore() {
-  return { profile: null, goals: [], liabilities: [], bills: [], income: [], expenses: [], projects: [], syncedAt: null };
+  return { profile: null, books: [], goals: [], liabilities: [], bills: [], income: [], expenses: [], projects: [], syncedAt: null };
 }
 
-function btLoadStore(uid) {
+/** The actual persisted shape — every book's data together, unfiltered. Only the engine itself (btQueueWrite, btUpdateProfile, btPullSnapshot, btGetOrLoadProfile) should touch this directly; everything else wants btLoadStore()'s book-scoped view below. */
+function btLoadRawStore(uid) {
   try {
     const raw = localStorage.getItem(btStoreKey(uid));
     return raw ? JSON.parse(raw) : btEmptyStore();
@@ -26,6 +27,59 @@ function btLoadStore(uid) {
 
 function btSaveStore(uid, store) {
   localStorage.setItem(btStoreKey(uid), JSON.stringify(store));
+}
+
+/** Settings that live per-book (account type, business/VAT fields, currency, category budgets, insurance, and every Protection Planner figure) rather than once per user. Everything else on bt_profiles (full_name, has_password, role, agent_id, fx_rates — a real-world exchange rate isn't "personal" or "business") stays put. */
+const BT_BOOK_FIELDS = [
+  "account_type", "business_name", "vat_registered", "vat_number", "vat_rate",
+  "currency", "annual_income", "dependents_count", "date_of_birth", "category_budgets",
+  "emergency_fund_months", "critical_illness_monthly_override", "life_insurance_monthly_override",
+  "burial_fund_estimates", "vacation_vault_pct", "vacation_vault_estimates", "hajj_umrah_estimates",
+  "car_insurance_premium", "car_insurance_renewal_date", "property_insurance_premium", "property_insurance_renewal_date"
+];
+
+/** Which book is "current" on this device — the last one explicitly picked, falling back to the account's default book (or just its first) if that pick is missing or stale, e.g. the book was deleted elsewhere. */
+function btCurrentBookId(uid, books) {
+  let stored = null;
+  try { stored = localStorage.getItem("bt_current_book_" + uid); } catch (e) {}
+  if (stored && (books || []).some((b) => b.id === stored)) return stored;
+  const fallback = (books || []).find((b) => b.is_default) || (books || [])[0];
+  return fallback ? fallback.id : null;
+}
+
+function btSetCurrentBookId(uid, bookId) {
+  try { localStorage.setItem("bt_current_book_" + uid, bookId); } catch (e) {}
+}
+
+/**
+ * The view every page actually reads: btLoadRawStore()'s full snapshot,
+ * filtered down to the currently-selected book's rows, with that book's
+ * own settings overlaid onto profile (as book_name/book_id plus the
+ * BT_BOOK_FIELDS above). Every existing call site — store.income,
+ * store.goals, store.profile.account_type, store.profile.currency, ... —
+ * keeps working completely unchanged, now automatically scoped to
+ * whichever book is selected.
+ */
+function btLoadStore(uid) {
+  const raw = btLoadRawStore(uid);
+  const books = raw.books || [];
+  const bookId = btCurrentBookId(uid, books);
+  const currentBook = books.find((b) => b.id === bookId) || null;
+  const bookSettings = {};
+  if (currentBook) BT_BOOK_FIELDS.forEach((f) => { if (f in currentBook) bookSettings[f] = currentBook[f]; });
+  const scope = (arr) => (arr || []).filter((r) => r.book_id === bookId);
+  return {
+    profile: currentBook ? { ...raw.profile, ...bookSettings, book_name: currentBook.name, book_id: currentBook.id } : raw.profile,
+    books,
+    currentBookId: bookId,
+    goals: scope(raw.goals),
+    liabilities: scope(raw.liabilities),
+    bills: scope(raw.bills),
+    income: scope(raw.income),
+    expenses: scope(raw.expenses),
+    projects: scope(raw.projects),
+    syncedAt: raw.syncedAt
+  };
 }
 
 function btLoadQueue(uid) {
@@ -45,7 +99,8 @@ const BT_TABLE_TO_STORE_KEY = {
   bt_goals: "goals",
   bt_liabilities: "liabilities",
   bt_recurring_bills: "bills",
-  bt_projects: "projects"
+  bt_projects: "projects",
+  bt_books: "books"
 };
 
 /**
@@ -53,11 +108,13 @@ const BT_TABLE_TO_STORE_KEY = {
  * snapshot right away so the UI reflects it instantly, offline or not.
  */
 function btQueueWrite(uid, table, op, payload, id) {
-  const store = btLoadStore(uid);
+  const store = btLoadRawStore(uid);
   const key = BT_TABLE_TO_STORE_KEY[table];
   const tempId = id || (self.crypto?.randomUUID ? crypto.randomUUID() : "tmp-" + Date.now() + "-" + Math.random().toString(36).slice(2));
 
   if (op === "insert") {
+    // A book doesn't belong to another book — every other table does.
+    if (table !== "bt_books") payload = { ...payload, book_id: btCurrentBookId(uid, store.books) };
     store[key].unshift({ ...payload, id: tempId, user_id: uid, _pending: true });
   } else if (op === "update") {
     const idx = store[key].findIndex((r) => r.id === id);
@@ -81,20 +138,38 @@ const btAddGoal = (uid, payload) => btQueueWrite(uid, "bt_goals", "insert", payl
 const btAddLiability = (uid, payload) => btQueueWrite(uid, "bt_liabilities", "insert", payload);
 const btAddBill = (uid, payload) => btQueueWrite(uid, "bt_recurring_bills", "insert", payload);
 const btAddProject = (uid, payload) => btQueueWrite(uid, "bt_projects", "insert", payload);
+const btAddBook = (uid, payload) => btQueueWrite(uid, "bt_books", "insert", payload);
 const btUpdateGoal = (uid, id, payload) => btQueueWrite(uid, "bt_goals", "update", payload, id);
 const btUpdateLiability = (uid, id, payload) => btQueueWrite(uid, "bt_liabilities", "update", payload, id);
 const btUpdateBill = (uid, id, payload) => btQueueWrite(uid, "bt_recurring_bills", "update", payload, id);
 const btUpdateProject = (uid, id, payload) => btQueueWrite(uid, "bt_projects", "update", payload, id);
+const btUpdateBook = (uid, id, payload) => btQueueWrite(uid, "bt_books", "update", payload, id);
 const btDeleteEntry = (uid, table, id) => btQueueWrite(uid, table, "delete", null, id);
 
-/** bt_profiles is a single object per user, not an array — handled separately from btQueueWrite. */
+/**
+ * bt_profiles is a single object per user, not an array; bt_books fields
+ * are per-book. A payload can freely mix both kinds (every existing
+ * caller already does, without knowing or needing to know which table a
+ * given field actually lives in) — this splits it by BT_BOOK_FIELDS and
+ * routes each half to the right table.
+ */
 function btUpdateProfile(uid, payload) {
-  const store = btLoadStore(uid);
-  store.profile = { ...store.profile, ...payload };
-  btSaveStore(uid, store);
+  const store = btLoadRawStore(uid);
+  const bookId = btCurrentBookId(uid, store.books);
+  const profileFields = {}, bookFields = {};
+  Object.keys(payload).forEach((k) => { (BT_BOOK_FIELDS.includes(k) ? bookFields : profileFields)[k] = payload[k]; });
 
   const queue = btLoadQueue(uid);
-  queue.push({ op: "update", table: "bt_profiles", id: uid, isTemp: false, payload });
+  if (Object.keys(profileFields).length) {
+    store.profile = { ...store.profile, ...profileFields };
+    queue.push({ op: "update", table: "bt_profiles", id: uid, isTemp: false, payload: profileFields });
+  }
+  if (Object.keys(bookFields).length && bookId) {
+    const idx = store.books.findIndex((b) => b.id === bookId);
+    if (idx >= 0) store.books[idx] = { ...store.books[idx], ...bookFields };
+    queue.push({ op: "update", table: "bt_books", id: bookId, isTemp: false, payload: bookFields });
+  }
+  btSaveStore(uid, store);
   btSaveQueue(uid, queue);
 
   btSyncSoon(uid);
@@ -127,6 +202,7 @@ async function btSync(uid) {
       if (payload && payload.liability_id && idMap[payload.liability_id]) payload = { ...payload, liability_id: idMap[payload.liability_id] };
       if (payload && payload.bill_id && idMap[payload.bill_id]) payload = { ...payload, bill_id: idMap[payload.bill_id] };
       if (payload && payload.project_id && idMap[payload.project_id]) payload = { ...payload, project_id: idMap[payload.project_id] };
+      if (payload && payload.book_id && idMap[payload.book_id]) payload = { ...payload, book_id: idMap[payload.book_id] };
 
       try {
         if (job.op === "insert") {
@@ -171,8 +247,9 @@ async function btPullSnapshot(uid) {
   twoYearsAgo.setFullYear(twoYearsAgo.getFullYear() - 2);
   const since = twoYearsAgo.toISOString().slice(0, 10);
 
-  const [profileRes, goalsRes, liabilitiesRes, billsRes, incomeRes, expenseRes, projectsRes] = await Promise.all([
+  const [profileRes, booksRes, goalsRes, liabilitiesRes, billsRes, incomeRes, expenseRes, projectsRes] = await Promise.all([
     btSupabase.from("bt_profiles").select("*").eq("id", uid).single(),
+    btSupabase.from("bt_books").select("*").eq("user_id", uid).order("sort_order", { ascending: true }),
     btSupabase.from("bt_goals").select("*").eq("user_id", uid).order("created_at", { ascending: false }),
     btSupabase.from("bt_liabilities").select("*").eq("user_id", uid).order("created_at", { ascending: false }),
     btSupabase.from("bt_recurring_bills").select("*").eq("user_id", uid).order("day_of_month", { ascending: true }),
@@ -181,8 +258,11 @@ async function btPullSnapshot(uid) {
     btSupabase.from("bt_projects").select("*").eq("user_id", uid).order("created_at", { ascending: false })
   ]);
 
+  // Every book's data comes down together — switching books is instant,
+  // filtered client-side in btLoadStore(), never a fresh network round-trip.
   const store = {
     profile: profileRes.data || null,
+    books: booksRes.data || [],
     goals: goalsRes.data || [],
     liabilities: liabilitiesRes.data || [],
     bills: billsRes.data || [],
@@ -499,13 +579,14 @@ function btDocStoragePath(uid, docId, file) {
   return `${uid}/${docId}.${ext}`;
 }
 
-/** Uploads a document image and inserts its metadata row. meta: {doc_type, bank_name, category, amount, doc_date, notes, income_id, expense_id}. Rolls back the upload if the row insert fails. */
+/** Uploads a document image and inserts its metadata row, tagged to whichever book is currently selected. meta: {doc_type, bank_name, category, amount, doc_date, notes, income_id, expense_id}. Rolls back the upload if the row insert fails. */
 async function btUploadDocument(uid, file, meta) {
   const docId = self.crypto?.randomUUID ? crypto.randomUUID() : "doc-" + Date.now() + "-" + Math.random().toString(36).slice(2);
   const path = btDocStoragePath(uid, docId, file);
   const { error: uploadError } = await btSupabase.storage.from("bt-documents").upload(path, file, { upsert: false, contentType: file.type || "image/jpeg" });
   if (uploadError) throw uploadError;
-  const row = { id: docId, user_id: uid, storage_path: path, ...meta };
+  const bookId = btCurrentBookId(uid, btLoadRawStore(uid).books);
+  const row = { id: docId, user_id: uid, book_id: bookId, storage_path: path, ...meta };
   const { data, error } = await btSupabase.from("bt_documents").insert(row).select().single();
   if (error) {
     await btSupabase.storage.from("bt-documents").remove([path]).catch(() => {});
@@ -514,9 +595,10 @@ async function btUploadDocument(uid, file, meta) {
   return data;
 }
 
-/** Every document row for this user — small metadata only, so sorting/filtering/grouping happens client-side against the full list. */
+/** Every document row for the currently-selected book — small metadata only, so sorting/filtering/grouping happens client-side against the full list. */
 async function btListDocuments(uid) {
-  const { data, error } = await btSupabase.from("bt_documents").select("*").eq("user_id", uid).order("doc_date", { ascending: false });
+  const bookId = btCurrentBookId(uid, btLoadRawStore(uid).books);
+  const { data, error } = await btSupabase.from("bt_documents").select("*").eq("user_id", uid).eq("book_id", bookId).order("doc_date", { ascending: false });
   if (error) throw error;
   return data || [];
 }

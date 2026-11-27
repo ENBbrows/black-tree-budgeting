@@ -55,6 +55,10 @@
   .bt-pie-legend .swatch { width:10px; height:10px; border-radius:3px; display:inline-block; margin-right:8px; flex:none; }
   .bt-list-row-plain { display:flex; justify-content:space-between; font-size:0.85rem; padding:6px 0; border-bottom:1px solid var(--bt-border); }
   .bt-list-row-plain:last-child { border-bottom:none; }
+  #book-switcher-wrap { margin-bottom: 16px; }
+  #book-switcher { overflow-x: auto; flex-wrap: nowrap; padding-bottom: 2px; }
+  #book-switcher .bt-chip { flex: none; white-space: nowrap; }
+  #book-add-form { margin-top: 10px; padding: 14px; background: var(--bt-cream); border-radius: var(--bt-radius); }
 </style>
 </head>
 <body>
@@ -75,6 +79,23 @@
 </div>
 
 <div class="bt-container bt-container--wide">
+  <div id="book-switcher-wrap">
+    <div class="bt-chip-row" id="book-switcher"></div>
+    <div id="book-add-form" style="display:none">
+      <label for="book-name">Book name</label>
+      <input id="book-name" type="text" placeholder="e.g. My Contracting Co" />
+      <label style="margin-top:10px">Type</label>
+      <div class="bt-chip-row" id="book-type-chips">
+        <button type="button" class="bt-chip" data-value="personal">Personal</button>
+        <button type="button" class="bt-chip bt-chip--selected" data-value="business">Business</button>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:12px">
+        <button type="button" class="bt-btn bt-btn--gold bt-btn--sm" id="book-add-save">Add book</button>
+        <button type="button" class="bt-btn bt-btn--ghost bt-btn--sm" id="book-add-cancel">Cancel</button>
+      </div>
+    </div>
+  </div>
+
   <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap">
     <div>
       <h1 id="bt-greeting">Your Financial Summary</h1>
@@ -580,8 +601,34 @@
     sel.innerHTML = options.map((c) => `<option value="${c}"${c === viewCurrency ? " selected" : ""}>${c}</option>`).join("");
   }
 
+  /** The top-of-page book switcher — one chip per book (Personal, plus any Business books added), switching is purely local (btSetCurrentBookId + re-render), no network round-trip needed since every book's data already came down together in the last sync. */
+  function renderBookSwitcher(store) {
+    const wrap = document.getElementById("book-switcher");
+    const books = store.books || [];
+    if (books.length < 2) {
+      // Nothing to switch between yet — just the one "+ Add book" chip, so it doesn't look like a dead-end control.
+      wrap.innerHTML = books.map((b) => `<button type="button" class="bt-chip bt-chip--selected" disabled>${btEscapeHtml(b.name)}</button>`).join("")
+        + `<button type="button" class="bt-chip" id="book-add-toggle">+ Add a business book</button>`;
+    } else {
+      wrap.innerHTML = books.map((b) => `<button type="button" class="bt-chip${b.id === store.currentBookId ? " bt-chip--selected" : ""}" data-book-id="${b.id}">${btEscapeHtml(b.name)}</button>`).join("")
+        + `<button type="button" class="bt-chip" id="book-add-toggle">+ Add book</button>`;
+    }
+    wrap.querySelectorAll("[data-book-id]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        if (btn.classList.contains("bt-chip--selected")) return;
+        btSetCurrentBookId(btUid, btn.dataset.bookId);
+        renderAll();
+      });
+    });
+    document.getElementById("book-add-toggle").addEventListener("click", () => {
+      const form = document.getElementById("book-add-form");
+      form.style.display = form.style.display === "none" ? "" : "none";
+    });
+  }
+
   function renderAll() {
     const store = btLoadStore(btUid);
+    renderBookSwitcher(store);
     document.getElementById("bt-greeting").textContent = store.profile?.full_name ? `Welcome back, ${store.profile.full_name}` : "Your Financial Summary";
     document.getElementById("bt-sync-note").textContent = store.syncedAt ? "Last synced " + new Date(store.syncedAt).toLocaleString() : "Not yet synced — connect once to load your data.";
     renderOnboard(store);
@@ -652,6 +699,40 @@
     });
 
     document.getElementById("bt-logout").addEventListener("click", async () => { await btSignOut(); window.location.replace("login.html"); });
+
+    document.querySelectorAll("#book-type-chips .bt-chip").forEach((chip) => {
+      chip.addEventListener("click", () => {
+        document.querySelectorAll("#book-type-chips .bt-chip").forEach((c) => c.classList.remove("bt-chip--selected"));
+        chip.classList.add("bt-chip--selected");
+      });
+    });
+    document.getElementById("book-add-cancel").addEventListener("click", () => {
+      document.getElementById("book-add-form").style.display = "none";
+    });
+    document.getElementById("book-add-save").addEventListener("click", async () => {
+      const name = document.getElementById("book-name").value.trim();
+      if (!name) return toast("Give the book a name.");
+      const account_type = document.querySelector("#book-type-chips .bt-chip--selected")?.dataset.value || "personal";
+      const saveBtn = document.getElementById("book-add-save");
+      saveBtn.disabled = true; saveBtn.textContent = "Adding…";
+
+      const tempId = btAddBook(btUid, { name, account_type });
+      let newId = tempId;
+      if (navigator.onLine) {
+        await btSync(btUid).catch(() => {});
+        // The temp id is gone once the pull replaces local data with the
+        // server's — the same book, just under its real id now.
+        const fresh = btLoadRawStore(btUid).books || [];
+        newId = fresh.find((b) => b.id === tempId)?.id || fresh.find((b) => b.name === name && b.account_type === account_type)?.id || tempId;
+      }
+      btSetCurrentBookId(btUid, newId);
+
+      document.getElementById("book-name").value = "";
+      document.getElementById("book-add-form").style.display = "none";
+      saveBtn.disabled = false; saveBtn.textContent = "Add book";
+      renderAll();
+      toast(`"${name}" added — switch to it anytime from the top.`);
+    });
 
     document.getElementById("savings-boost-btn").addEventListener("click", () => {
       sessionStorage.setItem("bt_expense_prefill", JSON.stringify({ category: "Savings & Investments", amount: BT_CONFIG.POINTS_PER_UNIT }));

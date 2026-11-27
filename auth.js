@@ -72,12 +72,12 @@ async function btRequireAuth() {
 
 /** Fetch (or lazily create/read) this user's bt_profiles row. Network required the first time only. */
 async function btGetOrLoadProfile(userId) {
-  const cached = btLoadStore(userId).profile;
+  const cached = btLoadRawStore(userId).profile;
   if (navigator.onLine) {
     try {
       const { data, error } = await btSupabase.from("bt_profiles").select("*").eq("id", userId).single();
       if (!error && data) {
-        const store = btLoadStore(userId);
+        const store = btLoadRawStore(userId);
         store.profile = data;
         btSaveStore(userId, store);
         return data;
