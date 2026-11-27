@@ -407,6 +407,35 @@
 
   function renderOnboard(store) {
     const el = document.getElementById("bt-onboard");
+    const bookName = store.profile?.book_name || "this book";
+
+    if (btIsBusinessAccount(store.profile)) {
+      // Goals/Debts don't apply to a business book, so the personal
+      // "set a goal" nudge below would never clear for one — guide it by
+      // what a business book actually needs instead: its name/VAT details,
+      // then its first bit of income or an expense.
+      const needsBizName = !store.profile?.business_name;
+      const needsIncome = !store.income.length;
+      const needsExpense = !store.expenses.length;
+      if (readOnly || (!needsBizName && !needsIncome && !needsExpense)) { el.style.display = "none"; return; }
+      el.style.display = "block";
+      let ask;
+      if (needsBizName) ask = "Add your business name (and VAT details, if you're registered) under Settings — then start logging income and expenses.";
+      else if (needsIncome && needsExpense) ask = "Log your first bit of income and an expense so your Business Books (P&L &amp; VAT) page has something to show.";
+      else if (needsIncome) ask = "Log your first bit of income to get your Profit &amp; Loss going.";
+      else ask = "Log your first expense to get your Profit &amp; Loss going.";
+      el.innerHTML = `
+        <div class="bt-onboard-card">
+          <h2>Setting up ${btEscapeHtml(bookName)}</h2>
+          <p style="margin-bottom:14px">${ask}</p>
+          <div style="display:flex;gap:10px;flex-wrap:wrap">
+            <a href="settings.html" class="bt-btn bt-btn--gold" style="text-decoration:none">Go to Settings →</a>
+            <a href="expense.html" class="bt-btn bt-btn--ghost" style="text-decoration:none">Log an Expense →</a>
+          </div>
+        </div>`;
+      return;
+    }
+
     if (readOnly || (store.income.length && store.goals.length)) { el.style.display = "none"; return; }
     el.style.display = "block";
     const needsIncome = !store.income.length;
