@@ -141,8 +141,13 @@
   </div>
 
   <div class="bt-card" id="income-card">
-    <button type="button" class="bt-status-btn" id="income-toggle" data-tip="Record a new income entry — salary, a side gig, a gift, whatever came in.">
-      <span>💰 Log income</span><span class="chev">▾</span>
+    <h2 style="margin-bottom:10px">💰 Log Income</h2>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px">
+      <button type="button" class="bt-btn bt-btn--gold" id="inc-scan-btn" data-tip="Snap or upload a screenshot of a payment — a bank transfer, a tenant's receipt, whatever you've got. It's read on your device, fills in the amount/date/who-it's-from below, and the image itself is saved to your Document Library automatically.">📷 Scan a payment</button>
+      <input type="file" id="inc-scan-file" accept="image/*" capture="environment" style="display:none" />
+    </div>
+    <button type="button" class="bt-status-btn" id="income-toggle" data-tip="Enter the details yourself instead of scanning a screenshot.">
+      <span>✏️ Enter manually</span><span class="chev">▾</span>
     </button>
     <div class="bt-status-detail" id="income-detail">
     <label for="inc-source" data-tip="What this money is from — your job, a side hustle, rental income, whatever fits. Type anything, or pick a suggestion.">Income source</label>
@@ -763,6 +768,50 @@
         document.querySelectorAll("#inc-category-chips .bt-chip").forEach((c) => c.classList.remove("bt-chip--selected"));
       }
     });
+
+    /** Snap/upload a payment screenshot — read on-device, fills the form below, and the image is saved to the Document Library for your own records. */
+    const incScanBtn = document.getElementById("inc-scan-btn");
+    const incScanIdleLabel = incScanBtn.textContent;
+    document.getElementById("inc-scan-file").addEventListener("change", async (e) => {
+      const file = e.target.files[0];
+      e.target.value = "";
+      if (!file) return;
+      incScanBtn.disabled = true;
+      incScanBtn.textContent = "⏳ Reading…";
+      try {
+        const guess = await btScanBillImage(file);
+        const text = (guess.lines || []).join(" ");
+        const isBiz = isBusinessNow();
+        const guessedCategory = isBiz ? btGuessIncomeCategory(text) : null;
+
+        document.getElementById("income-detail").classList.add("open");
+        document.querySelector("#income-toggle .chev").classList.add("open");
+        if (guess.merchant) document.getElementById("inc-source").value = guess.merchant;
+        if (guess.amount) document.getElementById("inc-amount").value = Number(guess.amount).toFixed(2);
+        if (guess.date) document.getElementById("inc-date").value = guess.date;
+        if (guessedCategory) {
+          document.querySelectorAll("#inc-category-chips .bt-chip").forEach((c) => c.classList.toggle("bt-chip--selected", c.dataset.value === guessedCategory));
+        }
+        suggestIncomeVatAmount();
+
+        if (navigator.onLine) {
+          try {
+            await btUploadDocument(btUid, file, {
+              doc_type: "bank_transfer", bank_name: null, category: guessedCategory, amount: guess.amount || null,
+              doc_date: guess.date || new Date().toISOString().slice(0, 10), notes: guess.merchant || null,
+              income_id: null, expense_id: null
+            });
+          } catch (e2) { /* scan still filled the form even if the record-keeping copy didn't save — not worth blocking on */ }
+        }
+        toast("Scanned — confirm the details below and save.");
+      } catch (err) {
+        console.error("Black Tree income scan failed", err);
+        toast("Couldn't read that image — try again or enter it manually.");
+      }
+      incScanBtn.disabled = false;
+      incScanBtn.textContent = incScanIdleLabel;
+    });
+    incScanBtn.addEventListener("click", () => document.getElementById("inc-scan-file").click());
   }
 
   function renderAll() {

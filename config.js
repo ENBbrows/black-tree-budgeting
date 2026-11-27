@@ -58,7 +58,15 @@ const BT_CONFIG = {
      business account's Income/Expense Trackers use these lists
      instead, and none of the personal-only sections (Protection
      Planner, Vacation Vault, down-payment goals, etc.) apply. */
-  BUSINESS_INCOME_CATEGORIES: ["Contract Revenue", "Service Income", "Product Sales", "Other Income"],
+  BUSINESS_INCOME_CATEGORIES: ["Contract Revenue", "Service Income", "Product Sales", "Property Sales", "Rental Income", "Other Income"],
+  /* Keyword guesses for a scanned payment screenshot's revenue category — same best-effort, always-confirm-before-saving approach as BUSINESS_CATEGORY_KEYWORDS below, just for the income side. Rental Income and Property Sales are checked before Product Sales so a plain "sale"/"sold" on a tenancy or closing document doesn't get misread as a retail sale. */
+  BUSINESS_INCOME_KEYWORDS: {
+    "Rental Income": ["rent", "rental", "tenant", "lease", "landlord"],
+    "Property Sales": ["property", "real estate", "closing", "deed", "deposit on sale", "purchase price"],
+    "Contract Revenue": ["contract", "invoice", "job payment", "progress payment"],
+    "Service Income": ["service", "consulting", "consultation fee"],
+    "Product Sales": ["sale", "sold", "pos", "receipt of payment"]
+  },
   BUSINESS_EXPENSE_CATEGORIES: [
     "Materials & Supplies", "Subcontractor Payments", "Labour & Wages",
     "Equipment & Tools", "Equipment Rental", "Vehicle & Transport",

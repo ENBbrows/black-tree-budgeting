@@ -378,6 +378,17 @@ function btGuessCategory(text) {
   return null;
 }
 
+/** Same idea as btGuessCategory, but for a scanned payment screenshot's business revenue category (Rental Income, Property Sales, ...) rather than a personal expense. */
+function btGuessIncomeCategory(text) {
+  if (!text) return null;
+  const lower = text.toLowerCase();
+  const dict = (typeof BT_CONFIG !== "undefined" && BT_CONFIG.BUSINESS_INCOME_KEYWORDS) || {};
+  for (const [category, keywords] of Object.entries(dict)) {
+    if (keywords.some((k) => lower.includes(k))) return category;
+  }
+  return null;
+}
+
 /** Same idea as btGuessCategory, but for how the bill says it was paid (card network, "cash tendered", etc). */
 function btGuessPaymentType(text) {
   if (!text) return null;
