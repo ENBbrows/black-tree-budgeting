@@ -14,6 +14,11 @@
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="theme.css" />
 <style>
+  .bt-status-btn { display:inline-flex; align-items:center; gap:7px; background: var(--bt-white); border: 1px solid var(--bt-border); border-radius: 999px; padding: 9px 15px; font-size: 0.86rem; font-weight:600; font-family:inherit; color: var(--bt-ink); cursor:pointer; }
+  .bt-status-btn .chev { font-size:0.65rem; color:var(--bt-muted); transition: transform .2s; }
+  .bt-status-btn .chev.open { transform: rotate(180deg); }
+  .bt-status-detail { display:none; margin: 10px 0 0; }
+  .bt-status-detail.open { display:block; }
   #pw-status.err { color: var(--bt-red); }
   .bt-role-tag { font-size:0.68rem; text-transform:uppercase; letter-spacing:0.03em; padding:3px 8px; border-radius:999px; font-weight:700; }
   .bt-section-head { display:flex; align-items:center; justify-content:space-between; margin: 26px 0 10px; }
@@ -96,8 +101,12 @@
     </div>
 
     <div id="fx-rates-wrap" style="margin-top:16px;padding-top:14px;border-top:1px dashed var(--bt-border)">
-      <label style="margin:0 0 8px" data-tip="Manual exchange rates for any foreign currency you log income in — set once, updated whenever you like. Nothing is fetched automatically, so this keeps working offline.">Exchange rates</label>
-      <div id="fx-rates-list"></div>
+      <button type="button" class="bt-status-btn" id="fx-toggle" data-tip="Manual exchange rates for any foreign currency you log income in — set once, used to convert totals you view in another currency.">
+        <span id="fx-btn-label">—</span><span class="chev">▾</span>
+      </button>
+      <div class="bt-status-detail" id="fx-detail">
+        <div id="fx-rates-list"></div>
+      </div>
     </div>
 
     <div id="budgets-wrap" style="margin-top:16px;padding-top:14px;border-top:1px dashed var(--bt-border)">
@@ -132,7 +141,10 @@
   </div>
 
   <div class="bt-card" id="income-card">
-    <h2>💰 Log Income</h2>
+    <button type="button" class="bt-status-btn" id="income-toggle" data-tip="Record a new income entry — salary, a side gig, a gift, whatever came in.">
+      <span>💰 Log income</span><span class="chev">▾</span>
+    </button>
+    <div class="bt-status-detail" id="income-detail">
     <label for="inc-source" data-tip="What this money is from — your job, a side hustle, rental income, whatever fits. Type anything, or pick a suggestion.">Income source</label>
     <input id="inc-source" type="text" list="inc-source-suggestions" placeholder="e.g. Salary / Primary Job" />
     <datalist id="inc-source-suggestions"></datalist>
@@ -166,9 +178,14 @@
       <div><label for="inc-payment-account" data-tip="Optional — which account it landed in.">Account <span style="font-weight:400;color:var(--bt-muted)">(optional)</span></label><input id="inc-payment-account" type="text" list="inc-payment-account-suggestions" /><datalist id="inc-payment-account-suggestions"></datalist></div>
     </div>
     <button class="bt-btn bt-btn--gold" id="inc-submit" style="margin-top:18px">Save income</button>
+    </div>
   </div>
 
   <div class="bt-card" id="goals-card">
+    <button type="button" class="bt-status-btn" id="goals-toggle" data-tip="Savings goals you're tracking toward a target amount or date — add one, or adjust an existing one's target.">
+      <span id="goals-btn-label">—</span><span class="chev">▾</span>
+    </button>
+    <div class="bt-status-detail" id="goals-detail">
     <div class="bt-section-head" style="margin:0 0 6px">
       <h2>Goals</h2>
       <button class="bt-btn bt-btn--ghost bt-btn--sm" id="toggle-goal-form">+ Add goal</button>
@@ -187,9 +204,14 @@
       <input id="g-date" type="date" />
       <button class="bt-btn bt-btn--gold" id="g-submit" style="margin-top:14px">Save goal</button>
     </div>
+    </div>
   </div>
 
   <div class="bt-card" id="debts-card">
+    <button type="button" class="bt-status-btn" id="debts-toggle" data-tip="Debts sorted by interest rate, highest first — paying that one down fastest saves the most in interest overall.">
+      <span id="debts-btn-label">—</span><span class="chev">▾</span>
+    </button>
+    <div class="bt-status-detail" id="debts-detail">
     <div class="bt-section-head" style="margin:0 0 6px">
       <h2>Debt Tracker</h2>
       <button class="bt-btn bt-btn--ghost bt-btn--sm" id="toggle-debt-form">+ Add debt</button>
@@ -211,14 +233,19 @@
       <input id="d-date" type="date" />
       <button class="bt-btn bt-btn--gold" id="d-submit" style="margin-top:14px">Save debt</button>
     </div>
+    </div>
   </div>
 
   <div class="bt-card bt-personal-only" id="dip-card" style="display:none">
-    <h2 data-tip="A suggested order to put this month's leftover money to work, based on your actual numbers. Every figure is yours to change; nothing here is saved automatically.">💡 Disposable Income Plan</h2>
+    <button type="button" class="bt-status-btn" id="dip-toggle" data-tip="A suggested order to put this month's leftover money to work, based on your real numbers — nothing here saves automatically unless you act on it elsewhere.">
+      <span>💡 Plan ready</span><span class="chev">▾</span>
+    </button>
+    <div class="bt-status-detail" id="dip-detail">
     <p class="bt-sub" id="dip-sub" style="margin-bottom:10px">—</p>
     <div id="dip-list"></div>
     <div style="display:flex;justify-content:space-between;font-size:0.85rem;margin-top:10px;padding-top:10px;border-top:1px solid var(--bt-border)">
       <span>Allocated</span><span id="dip-total">—</span>
+    </div>
     </div>
   </div>
 
@@ -233,9 +260,13 @@
   </div>
 
   <div class="bt-card bt-personal-only" id="badges-card">
-    <h2>🏆 Achievements</h2>
-    <p class="bt-sub" style="margin-bottom:14px">Each badge fills in with your progress and lights up fully once it's earned — one for every goal reached, one for every debt settled, and one for the Vacation Vault once it's funded.</p>
+    <button type="button" class="bt-status-btn" id="badges-toggle" data-tip="One badge per goal reached, debt settled, and the Vacation Vault once it's funded.">
+      <span id="badges-btn-label">—</span><span class="chev">▾</span>
+    </button>
+    <div class="bt-status-detail" id="badges-detail">
+    <p class="bt-sub" style="margin:10px 0 14px">Each badge fills in with your progress and lights up fully once it's earned — one for every goal reached, one for every debt settled, and one for the Vacation Vault once it's funded.</p>
     <div class="bt-badges-grid" id="badges-grid"></div>
+    </div>
   </div>
 
   <p class="bt-sub" style="text-align:center"><a href="setup-guide.html">Add these to your home screen →</a></p>
@@ -324,6 +355,8 @@
     const home = store.profile?.currency || "TTD";
     const extras = (BT_CONFIG.EXTRA_CURRENCIES || []).filter((c) => c !== home);
     const rates = store.profile?.fx_rates || {};
+    const setCount = extras.filter((c) => rates[c] > 0).length;
+    document.getElementById("fx-btn-label").textContent = setCount ? `💱 ${setCount} rate${setCount === 1 ? "" : "s"} set` : "💱 No rates set";
     const wrap = document.getElementById("fx-rates-list");
     if (!extras.length) { wrap.innerHTML = ""; return; }
     wrap.innerHTML = extras.map((cur) => `
@@ -388,6 +421,7 @@
 
   function renderGoals(store) {
     const list = btGoalProgress(store);
+    document.getElementById("goals-btn-label").textContent = list.length ? `🎯 ${list.length} goal${list.length === 1 ? "" : "s"}` : "🎯 No goals yet";
     const wrap = document.getElementById("goals-list");
     if (!list.length) { wrap.innerHTML = '<div class="bt-empty">No goals yet.</div>'; return; }
     wrap.innerHTML = list.map((g) => `
@@ -408,6 +442,7 @@
 
   function renderDebts(store) {
     const list = btDebtAvalancheOrder(store);
+    document.getElementById("debts-btn-label").textContent = list.length ? `💳 ${list.length} debt${list.length === 1 ? "" : "s"}` : "💳 No debts tracked";
     const wrap = document.getElementById("debts-list");
     if (!list.length) { wrap.innerHTML = '<div class="bt-empty">No debts tracked.</div>'; return; }
     const topPriorityId = list.length > 1 && list[0].interest_rate != null ? list[0].id : null;
@@ -546,6 +581,8 @@
 
   function renderBadges(store) {
     const badges = computeBadges(store);
+    const earnedCount = badges.filter((b) => b.earned).length;
+    document.getElementById("badges-btn-label").textContent = `🏆 ${earnedCount} earned`;
     const wrap = document.getElementById("badges-grid");
     if (!badges.length) { wrap.innerHTML = '<div class="bt-empty">Add a goal or debt to start earning badges.</div>'; return; }
 
@@ -908,6 +945,13 @@
       const opening = form.style.display === "none";
       form.style.display = opening ? "" : "none";
       if (opening) renderBudgetsInputs(btLoadStore(btUid));
+    });
+
+    ["fx", "income", "goals", "debts", "dip", "badges"].forEach((key) => {
+      document.getElementById(key + "-toggle").addEventListener("click", () => {
+        document.getElementById(key + "-detail").classList.toggle("open");
+        document.querySelector(`#${key}-toggle .chev`).classList.toggle("open");
+      });
     });
     document.getElementById("budgets-save").addEventListener("click", () => {
       saveAllSettings();
