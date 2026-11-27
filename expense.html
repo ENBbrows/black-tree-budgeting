@@ -101,7 +101,7 @@
     <input id="f-desc" type="text" placeholder="e.g. Grocery run at Massy Stores" />
 
     <div class="bt-field-row">
-      <div>
+      <div id="f-amount-wrap">
         <label for="f-amount" data-tip="How much you spent, e.g. 250.00.">Amount</label>
         <input id="f-amount" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0.00" />
       </div>
@@ -111,9 +111,31 @@
       </div>
     </div>
 
+    <div id="category-normal-wrap">
     <label data-tip="What kind of spending this is — we guess this from what you typed above, but change it any time. Pick more than one if this bill covers several kinds of spending (a supermarket run that's also got household items, say) — you'll get to split the amount across them. Pick Debt Repayment or Savings & Investments if you want it to count toward a goal or debt below.">Category <span style="font-weight:400;color:var(--bt-muted)">(pick one, or several if this bill covers more than one)</span></label>
     <div class="bt-chip-row" id="f-category-chips"></div>
     <p id="category-hint">Guessed from what you typed — tap to change, or tap more to add.</p>
+    </div>
+
+    <button type="button" class="bt-status-btn" id="xbook-toggle" style="display:none;margin:2px 0 12px" data-tip="Use this when one bill covers both personal spending and this book's business spending — a combined phone bill, a receipt with a mix of items. Logs it as two separate entries, one per book, in one go.">
+      <span>🔀 Split between Personal &amp; Business</span><span class="chev">▾</span>
+    </button>
+    <div class="bt-status-detail" id="xbook-wrap">
+      <div class="bt-field-row">
+        <div><label for="xb-personal-amount">Personal amount</label><input id="xb-personal-amount" type="number" min="0" step="0.01" placeholder="0.00" /></div>
+        <div><label for="xb-personal-category">Personal category</label><select id="xb-personal-category"></select></div>
+      </div>
+      <div class="bt-field-row" style="margin-top:10px">
+        <div><label for="xb-business-amount">Business amount</label><input id="xb-business-amount" type="number" min="0" step="0.01" placeholder="0.00" /></div>
+        <div><label for="xb-business-category">Business category</label><select id="xb-business-category"></select></div>
+      </div>
+      <div id="xb-book-picker-wrap" style="display:none;margin-top:10px">
+        <label for="xb-business-book">Which business book?</label>
+        <select id="xb-business-book"></select>
+      </div>
+      <p class="bt-sub" id="xb-total-note" style="margin-top:8px">—</p>
+      <button type="button" class="bt-btn bt-btn--gold" id="xb-submit" style="margin-top:14px">Save split</button>
+    </div>
 
     <div id="biz-expense-fields" style="display:none">
       <label data-tip="Was VAT charged on this purchase? Pick the treatment, then confirm the VAT portion of the amount above — we suggest it automatically at your account's VAT rate for a standard-rated purchase, but you can adjust it.">VAT treatment</label>
@@ -190,6 +212,54 @@
   }
   function currentExpenseCategories() {
     return isBusinessNow() ? BT_CONFIG.BUSINESS_EXPENSE_CATEGORIES : BT_CONFIG.EXPENSE_CATEGORIES;
+  }
+
+  /**
+   * The "Split between Personal & Business" toggle only makes sense once
+   * the account actually has one of each kind of book — otherwise there's
+   * nothing to split into, so the button stays hidden entirely rather
+   * than offering a choice with only one real option.
+   */
+  function updateXbookVisibility() {
+    const store = btLoadStore(btUid);
+    const books = store.books || [];
+    const personalBook = books.find((b) => b.account_type === "personal");
+    const businessBooks = books.filter((b) => b.account_type === "business");
+    const toggle = document.getElementById("xbook-toggle");
+    const show = !!personalBook && businessBooks.length > 0;
+    toggle.style.display = show ? "" : "none";
+    if (!show) return;
+
+    document.getElementById("xb-personal-category").innerHTML = BT_CONFIG.EXPENSE_CATEGORIES.map((c) => `<option value="${btEscapeHtml(c)}">${btEscapeHtml(c)}</option>`).join("");
+    document.getElementById("xb-business-category").innerHTML = BT_CONFIG.BUSINESS_EXPENSE_CATEGORIES.map((c) => `<option value="${btEscapeHtml(c)}">${btEscapeHtml(c)}</option>`).join("");
+    const bookPickerWrap = document.getElementById("xb-book-picker-wrap");
+    if (businessBooks.length > 1) {
+      bookPickerWrap.style.display = "";
+      document.getElementById("xb-business-book").innerHTML = businessBooks.map((b) => `<option value="${b.id}">${btEscapeHtml(b.name)}</option>`).join("");
+    } else {
+      bookPickerWrap.style.display = "none";
+    }
+  }
+
+  function setXbookMode(on) {
+    document.getElementById("xbook-wrap").classList.toggle("open", on);
+    document.querySelector("#xbook-toggle .chev").classList.toggle("open", on);
+    document.getElementById("category-normal-wrap").style.display = on ? "none" : "";
+    document.getElementById("biz-expense-fields").style.display = on ? "none" : (isBusinessNow() ? "" : "none");
+    document.getElementById("split-wrap").style.display = on ? "none" : document.getElementById("split-wrap").style.display;
+    document.getElementById("link-wrap").style.display = on ? "none" : document.getElementById("link-wrap").style.display;
+    document.getElementById("f-amount-wrap").style.display = on ? "none" : "";
+    document.getElementById("f-submit").style.display = on ? "none" : "";
+    if (on) {
+      document.querySelectorAll("#f-category-chips .bt-chip").forEach((c) => c.classList.remove("bt-chip--selected"));
+      updateXbookTotal();
+    }
+  }
+
+  function updateXbookTotal() {
+    const personal = parseFloat(document.getElementById("xb-personal-amount").value) || 0;
+    const business = parseFloat(document.getElementById("xb-business-amount").value) || 0;
+    document.getElementById("xb-total-note").textContent = `Total: ${(personal + business).toFixed(2)}`;
   }
 
   function toast(msg) {
@@ -556,6 +626,7 @@
     renderCategoryChips();
     renderVatChips();
     populateProjectOptions();
+    updateXbookVisibility();
     document.getElementById("f-amount").addEventListener("input", () => { renderSplitSection(); suggestVatAmount(); });
     document.getElementById("f-project").addEventListener("change", async (e) => {
       if (e.target.value !== "__new__") return;
@@ -642,6 +713,7 @@
       renderRecent(); updateLinkOptions(); refreshPaymentAccountSuggestions();
       renderCategoryChips(); renderVatChips(); populateProjectOptions();
       renderBills();
+      updateXbookVisibility();
       if (pendingLinkId) document.getElementById("f-link").value = pendingLinkId;
     });
 
@@ -740,6 +812,54 @@
       lineCategoryTags = {};
       document.querySelectorAll("#f-category-chips .bt-chip").forEach((c) => c.classList.remove("bt-chip--selected"));
       renderSplitSection();
+    });
+
+    document.getElementById("xbook-toggle").addEventListener("click", () => {
+      setXbookMode(!document.getElementById("xbook-wrap").classList.contains("open"));
+    });
+    document.getElementById("xb-personal-amount").addEventListener("input", updateXbookTotal);
+    document.getElementById("xb-business-amount").addEventListener("input", updateXbookTotal);
+
+    document.getElementById("xb-submit").addEventListener("click", () => {
+      const notes = document.getElementById("f-desc").value.trim() || null;
+      const expense_date = document.getElementById("f-date").value;
+      const payment_type = paymentSel.value || null;
+      const payment_account = document.getElementById("f-payment-account").value.trim() || null;
+      const personalAmount = parseFloat(document.getElementById("xb-personal-amount").value) || 0;
+      const businessAmount = parseFloat(document.getElementById("xb-business-amount").value) || 0;
+      const personalCategory = document.getElementById("xb-personal-category").value;
+      const businessCategory = document.getElementById("xb-business-category").value;
+
+      if (!notes) return toast("Say what this was for.");
+      if (!expense_date) return toast("Pick a date.");
+      if (personalAmount <= 0 && businessAmount <= 0) return toast("Enter at least one portion's amount.");
+
+      const store = btLoadStore(btUid);
+      const books = store.books || [];
+      const personalBook = books.find((b) => b.account_type === "personal");
+      const businessBooks = books.filter((b) => b.account_type === "business");
+      const businessBookId = document.getElementById("xb-business-book").value || businessBooks[0]?.id;
+
+      if (personalAmount > 0) {
+        if (!personalBook) return toast("No Personal book found to log that portion to.");
+        btAddExpense(btUid, { category: personalCategory, amount: personalAmount, expense_date, notes, goal_id: null, liability_id: null, payment_type, payment_account, book_id: personalBook.id });
+      }
+      if (businessAmount > 0) {
+        if (!businessBookId) return toast("No Business book found to log that portion to.");
+        btAddExpense(btUid, { category: businessCategory, amount: businessAmount, expense_date, notes, goal_id: null, liability_id: null, payment_type, payment_account, book_id: businessBookId });
+      }
+
+      renderRecent();
+      refreshPaymentAccountSuggestions();
+      toast(navigator.onLine ? "Split logged — one entry in each book" : "Saved offline — will sync automatically");
+      if (payment_type) localStorage.setItem("bt_last_payment_type", payment_type);
+
+      document.getElementById("f-desc").value = "";
+      document.getElementById("xb-personal-amount").value = "";
+      document.getElementById("xb-business-amount").value = "";
+      document.getElementById("f-payment-account").value = "";
+      updateXbookTotal();
+      setXbookMode(false);
     });
 
     if ("serviceWorker" in navigator) {

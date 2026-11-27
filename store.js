@@ -113,8 +113,11 @@ function btQueueWrite(uid, table, op, payload, id) {
   const tempId = id || (self.crypto?.randomUUID ? crypto.randomUUID() : "tmp-" + Date.now() + "-" + Math.random().toString(36).slice(2));
 
   if (op === "insert") {
-    // A book doesn't belong to another book — every other table does.
-    if (table !== "bt_books") payload = { ...payload, book_id: btCurrentBookId(uid, store.books) };
+    // A book doesn't belong to another book — every other table does,
+    // defaulting to whichever one is currently selected unless the
+    // caller already named a specific one (e.g. splitting one bill
+    // across two different books at once).
+    if (table !== "bt_books") payload = { ...payload, book_id: payload.book_id || btCurrentBookId(uid, store.books) };
     store[key].unshift({ ...payload, id: tempId, user_id: uid, _pending: true });
   } else if (op === "update") {
     const idx = store[key].findIndex((r) => r.id === id);

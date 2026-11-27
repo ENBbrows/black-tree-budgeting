@@ -240,4 +240,14 @@ label[data-tip]::after {
 .bt-chip { border: 1px solid var(--bt-border); background: var(--bt-white); border-radius: 999px; padding: 7px 14px; font-size: 0.82rem; font-family: inherit; cursor: pointer; }
 .bt-chip--selected { background: var(--bt-gold); border-color: var(--bt-gold); color: #fff; }
 
+/* A small pill button that expands a section below it — used anywhere a
+   card's detail (a list, a form, a breakdown) should stay collapsed by
+   default instead of taking up permanent space. */
+.bt-status-btn-row { display: flex; gap: 10px; flex-wrap: wrap; margin: 4px 0 6px; }
+.bt-status-btn { display: inline-flex; align-items: center; gap: 7px; background: var(--bt-white); border: 1px solid var(--bt-border); border-radius: 999px; padding: 9px 15px; font-size: 0.86rem; font-weight: 600; font-family: inherit; color: var(--bt-ink); cursor: pointer; }
+.bt-status-btn .chev { font-size: 0.65rem; color: var(--bt-muted); transition: transform .2s; }
+.bt-status-btn .chev.open { transform: rotate(180deg); }
+.bt-status-detail { display: none; margin: 8px 0 14px; }
+.bt-status-detail.open { display: block; }
+
 ::selection { background: var(--bt-gold-light); }
