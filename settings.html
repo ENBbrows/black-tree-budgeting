@@ -101,6 +101,7 @@
       </button>
       <div class="bt-status-detail" id="fx-detail">
         <div id="fx-rates-list"></div>
+        <button type="button" class="bt-btn bt-btn--gold bt-btn--sm" id="fx-save" style="margin-top:10px">Save rates</button>
       </div>
     </div>
 
@@ -475,7 +476,7 @@
 
     const plan = btDisposableIncomePlan(store, summary, store.profile?.currency);
     document.getElementById("dip-sub").textContent = plan.items.length
-      ? `You have ${fmtHome(plan.disposable)} in disposable income this month — here's a suggested order to put it to work. Adjust any figure below as you like.`
+      ? `You have ${fmtHome(plan.disposable)} in disposable income this month — here's a suggested order to put it to work. Adjust any figure below as you like — this is just a planning aid, so nothing here is saved; log the actual amount under Income/Expenses once you decide.`
       : `You have ${fmtHome(plan.disposable)} in disposable income this month, with nothing urgent left to fund — save it, spend it, or add a new goal.`;
 
     document.getElementById("dip-list").innerHTML = plan.items.map((item) => `
@@ -1000,6 +1001,10 @@
     document.getElementById("budgets-save").addEventListener("click", () => {
       saveAllSettings();
       toast("Budgets saved");
+    });
+    document.getElementById("fx-save").addEventListener("click", () => {
+      saveAllSettings();
+      toast("Exchange rates saved");
     });
 
     if ("serviceWorker" in navigator) {
