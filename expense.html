@@ -175,6 +175,7 @@
 <script src="config.js"></script>
 <script src="auth.js"></script>
 <script src="store.js"></script>
+<script src="celebrate.js"></script>
 <script src="tips.js"></script>
 <script>
   let btUid = null;
@@ -659,6 +660,14 @@
       if (!amount || amount <= 0) return toast("Enter a valid amount.");
       if (!expense_date) return toast("Pick a date.");
 
+      // Snapshot before saving, so we can tell afterward whether THIS save
+      // was the one that finished a linked goal or settled a linked debt —
+      // worth the big fanfare+confetti moment, versus just logging toward
+      // one that's still in progress.
+      const beforeStore = btLoadStore(btUid);
+      const wasGoalDone = linkId && linkSel.dataset.kind === "goal" && (btGoalProgress(beforeStore).find((g) => g.id === linkId)?.progress_pct >= 1);
+      const wasDebtDone = linkId && linkSel.dataset.kind === "liability" && (btLiabilityProgress(beforeStore).find((l) => l.id === linkId)?.estimated_remaining <= 0);
+
       if (cats.length === 1) {
         const category = cats[0];
         const payload = { category, amount, expense_date, notes, goal_id: null, liability_id: null, payment_type, payment_account };
@@ -687,6 +696,18 @@
       renderRecent();
       refreshPaymentAccountSuggestions();
       toast(navigator.onLine ? "Expense saved" : "Saved offline — will sync automatically");
+
+      // A finished goal or settled debt gets the big moment; a plain
+      // Savings/Charity entry that didn't finish anything still gets a
+      // small acknowledging chime — never both at once.
+      const afterStore = btLoadStore(btUid);
+      const nowGoalDone = linkId && linkSel.dataset.kind === "goal" && (btGoalProgress(afterStore).find((g) => g.id === linkId)?.progress_pct >= 1);
+      const nowDebtDone = linkId && linkSel.dataset.kind === "liability" && (btLiabilityProgress(afterStore).find((l) => l.id === linkId)?.estimated_remaining <= 0);
+      if ((nowGoalDone && !wasGoalDone) || (nowDebtDone && !wasDebtDone)) {
+        btCelebrateAchievement();
+      } else if (cats.some((c) => (BT_CONFIG.SAVINGS_WINS_CATEGORIES || []).includes(c))) {
+        btPlayDepositChime();
+      }
 
       if (payment_type) localStorage.setItem("bt_last_payment_type", payment_type);
 
